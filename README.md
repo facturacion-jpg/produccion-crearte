@@ -323,6 +323,15 @@ Columnas de la hoja: `usuario | nombre | correo | rol | planta_id | activo | sal
 - [ ] Confirmar que `firmar.html?tipo=...&id=...&token=...` abre sin sesión.
 - [ ] Verificar que las reglas de Firebase no estén abiertas.
 
+## Material de capacitación
+
+Entregable listo para compartir con el equipo:
+
+- [Capacitación por rol (PPTX)](Capacitacion-Portal-Produccion-Por-Rol.pptx) — 13 diapositivas editables.
+- [Capacitación por rol (PDF)](Capacitacion-Portal-Produccion-Por-Rol.pdf) — misma presentación en formato de solo lectura.
+
+Cubre acceso, mapa de roles y el paso a paso de `ADMIN`, `FICHAS`, `TELAS`, `INSUMOS`, `PLANTA` y `LECTURA`, además de la firma pública, el flujo completo de una orden y reglas rápidas.
+
 ## Limitaciones del esquema sin backend propio
 
 - No hay secretos del lado servidor: todo lo que necesita el navegador es público.
