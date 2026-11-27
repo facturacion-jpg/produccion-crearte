@@ -179,8 +179,6 @@
             const mensajeError = "No se pudo contactar con el servidor de usuarios. Revisa la URL del Web App y vuelve a intentar.";
             let terminado = false;
             let script = null;
-            let form = null;
-            let iframe = null;
             let timer = null;
             let pollTimer = null;
 
@@ -188,8 +186,6 @@
                 if (timer) window.clearTimeout(timer);
                 if (pollTimer) window.clearTimeout(pollTimer);
                 if (script && script.parentNode) script.parentNode.removeChild(script);
-                if (form && form.parentNode) form.parentNode.removeChild(form);
-                if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
                 try { delete window[cb]; } catch (err) { window[cb] = undefined; }
             }
 
@@ -228,29 +224,17 @@
                 finalizar({ ok: false, mensaje: mensajeError });
             }, timeoutMs);
 
-            // El iframe no puede mostrar la respuesta (X-Frame-Options), pero el
-            // POST llega igual al Web App. El resultado se obtiene por JSONP.
+            // POST "no-cors": la respuesta es opaca, pero el Web App procesa la
+            // acción y guarda el resultado. Después se lee con JSONP por nonce.
             try {
-                iframe = document.createElement("iframe");
-                iframe.name = "auth-post-" + nonce;
-                iframe.style.display = "none";
-                iframe.setAttribute("aria-hidden", "true");
-
-                form = document.createElement("form");
-                form.method = "POST";
-                form.action = APP_SYSTEM.apiAuthUrl;
-                form.target = iframe.name;
-                form.style.display = "none";
-
-                const input = document.createElement("input");
-                input.type = "hidden";
-                input.name = "payload";
-                input.value = JSON.stringify({ accion: accion, datos: datos || {}, nonce: nonce });
-                form.appendChild(input);
-
-                document.body.appendChild(iframe);
-                document.body.appendChild(form);
-                form.submit();
+                const cuerpo = new URLSearchParams();
+                cuerpo.append("payload", JSON.stringify({ accion: accion, datos: datos || {}, nonce: nonce }));
+                fetch(APP_SYSTEM.apiAuthUrl, {
+                    method: "POST",
+                    mode: "no-cors",
+                    credentials: "omit",
+                    body: cuerpo
+                }).catch(function () { /* la respuesta es opaca; se consulta por JSONP */ });
             } catch (err) {
                 finalizar({ ok: false, mensaje: mensajeError });
                 return;
