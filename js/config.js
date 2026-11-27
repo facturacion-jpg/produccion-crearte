@@ -51,19 +51,5 @@ const DEFAULT_CONFIG = {
     publicBaseUrl: ""
 };
 
-const DEFAULT_PLANTAS = [
-    {
-        id: "PLT-01",
-        nombre: "Taller Aliado Norte",
-        ciudad: "Bello - Antioquia",
-        email: "taller.norte@ejemplo.com",
-        contacto: "Coordinador de Planta"
-    },
-    {
-        id: "PLT-02",
-        nombre: "Taller Aliado Sur",
-        ciudad: "Itagüí - Antioquia",
-        email: "taller.sur@ejemplo.com",
-        contacto: "Jefe de Producción"
-    }
-];
+// No hay plantas predeterminadas: se registran desde Configuración.
+const DEFAULT_PLANTAS = [];

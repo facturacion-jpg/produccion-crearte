@@ -112,6 +112,7 @@ Las reglas nuevas exigen custom token:
 Con las reglas antiguas (`.read: "auth != null"`, `.write: "auth != null"`) cualquier visitante podía usar la API de Firebase directamente. Con reglas públicas (`.read: true`, `.write: true`) cualquiera podía leer o borrar los datos.
 
 Los datos se guardan bajo `crearte_produccion/{produccion_config|produccion_plantas|produccion_fichas|produccion_solicitudes|produccion_firmas|produccion_firmas_despachos}`.
+No hay plantas predeterminadas: se registran desde **Configuración → Agregar Planta Externa**. Cada planta guarda nombre, ciudad, responsable, correo y **celular**; el celular se muestra en el panel y se incluye en los correos de ficha y despacho.
 La firma de la salida inicial se guarda aparte, en `crearte_produccion/produccion_firmas/{idFicha}`, y la firma de cada despacho de material en `crearte_produccion/produccion_firmas_despachos/{idSolicitud}`. Así no se reescribe la ficha ni la solicitud desde el celular de la planta. La plataforma escucha ambos nodos y muestra la evidencia automáticamente.
 
 Si no quieres acumular histórico, crea una limpieza programada desde Apps Script (no existe cron en un sitio estático).

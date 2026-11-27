@@ -15,7 +15,7 @@ let appFirmas = DataStore.load(DataStore.KEYS.FIRMAS, {});
 let appFirmasDespachos = DataStore.load(DataStore.KEYS.FIRMAS_DESPACHOS, {});
 
 let currentRole = "central";
-let activePlantaId = appPlantas[0]?.id || "PLT-01";
+let activePlantaId = appPlantas[0]?.id || "";
 let activeBodegaArea = "ALL";
 let pendingCommitCallback = null;
 let pendingEmailPayload = null;
@@ -266,7 +266,7 @@ function aplicarPermisosAuth() {
         const plantaAsignada = appPlantas.find(p => p.id === s.plantaId);
         const ciudad = document.getElementById("active-planta-ciudad");
         if (plantaAsignada && ciudad) {
-            ciudad.textContent = `${plantaAsignada.ciudad} • Contacto: ${plantaAsignada.contacto} (${plantaAsignada.email})`;
+            ciudad.textContent = `${plantaAsignada.ciudad} • Contacto: ${plantaAsignada.contacto} (${plantaAsignada.email}) • Cel: ${plantaAsignada.celular || "—"}`;
         }
     }
 
@@ -367,9 +367,7 @@ function populatePlantasSelectors() {
 function syncPlantaEmail() {
     const pId = document.getElementById("fs-planta-id").value;
     const planta = appPlantas.find(p => p.id === pId);
-    if (planta) {
-        document.getElementById("fs-email").value = planta.email;
-    }
+    document.getElementById("fs-email").value = planta ? planta.email : "";
 }
 
 function onActivePlantaChange() {
@@ -383,8 +381,11 @@ function onActivePlantaChange() {
         }
     }
     const planta = appPlantas.find(p => p.id === activePlantaId);
-    if (planta) {
-        document.getElementById("active-planta-ciudad").textContent = `${planta.ciudad} • Contacto: ${planta.contacto} (${planta.email})`;
+    const ciudadEl = document.getElementById("active-planta-ciudad");
+    if (ciudadEl) {
+        ciudadEl.textContent = planta
+            ? `${planta.ciudad} • Contacto: ${planta.contacto} (${planta.email}) • Cel: ${planta.celular || "—"}`
+            : "Registra una planta externa en Configuración para comenzar.";
     }
     renderPlantaView();
 }
@@ -396,6 +397,7 @@ function renderConfigPlantasList() {
             <div>
                 <div class="font-extrabold text-zinc-950">${p.nombre}</div>
                 <div class="text-zinc-500">${p.ciudad} • ${p.contacto}</div>
+                ${p.celular ? `<div class="text-zinc-500">Celular: ${p.celular}</div>` : ""}
                 <div class="font-mono text-[11px] text-zinc-800 font-semibold mt-0.5">${p.email}</div>
             </div>
             <span class="px-2 py-0.5 rounded bg-zinc-900 text-yellow-400 font-mono font-bold text-[10px]">${p.id}</span>
@@ -406,14 +408,18 @@ function renderConfigPlantasList() {
 function addNewPlanta(e) {
     e.preventDefault();
     if (!requierePermiso("configurar")) return;
+    const nextNumero = appPlantas.reduce((max, p) =>
+        Math.max(max, parseInt(String(p.id || "").replace(/\D/g, ""), 10) || 0), 0) + 1;
     const newPlanta = {
-        id: `PLT-0${appPlantas.length + 1}`,
+        id: `PLT-${String(nextNumero).padStart(2, "0")}`,
         nombre: document.getElementById("new-plt-nombre").value.trim(),
         ciudad: document.getElementById("new-plt-ciudad").value.trim(),
         contacto: document.getElementById("new-plt-contacto").value.trim(),
-        email: document.getElementById("new-plt-email").value.trim()
+        email: document.getElementById("new-plt-email").value.trim(),
+        celular: document.getElementById("new-plt-celular").value.trim()
     };
     appPlantas.push(newPlanta);
+    activePlantaId = newPlanta.id;
     saveAllState([DataStore.KEYS.PLANTAS]);
     populatePlantasSelectors();
     renderConfigPlantasList();
@@ -760,7 +766,7 @@ function handlePreviewFichaSalida(e) {
         `Desde el área de ${APP_SYSTEM.nombreApp} de ${APP_SYSTEM.empresa} (${APP_SYSTEM.nit || "NIT. 901.367.620-0"}), remitimos la Ficha Técnica y la Orden de Salida Inicial de materiales:\n\n` +
         `====================================================\n` +
         `ID REMISIÓN: ${ftId}\n` +
-        `PLANTA EXTERNA: ${planta.nombre}\n` +
+        `PLANTA EXTERNA: ${planta.nombre}${planta.celular ? ` - CELULAR: ${planta.celular}` : ""}\n` +
         `REFERENCIA: ${ref} (${cantPrendas} unidades)\n` +
         `PRENDA: ${prenda} (${cliente})\n` +
         `FICHA TÉCNICA: ${archivoFicha}\n` +
@@ -1735,6 +1741,7 @@ async function confirmDispatch(e) {
             `REFERENCIA / LOTE: ${sol.referencia} / ${sol.lote}\n` +
             `MOTIVO: ${sol.motivo}\n` +
             `FECHA DESPACHO: ${now}\n` +
+            (planta?.celular ? `CELULAR PLANTA: ${planta.celular}\n` : "") +
             (transporte ? `TRANSPORTE / MENSAJERO: ${transporte}\n` : "") +
             `\nMATERIALES DESPACHADOS:\n${materiales}\n\n` +
             (notas ? `OBSERVACIONES DEL DESPACHO:\n${notas}\n\n` : "") +
