@@ -233,6 +233,7 @@
                     method: "POST",
                     mode: "no-cors",
                     credentials: "omit",
+                    redirect: "manual",
                     body: cuerpo
                 }).catch(function () { /* la respuesta es opaca; se consulta por JSONP */ });
             } catch (err) {
