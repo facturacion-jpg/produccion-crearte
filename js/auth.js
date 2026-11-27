@@ -229,13 +229,16 @@
             try {
                 const cuerpo = new URLSearchParams();
                 cuerpo.append("payload", JSON.stringify({ accion: accion, datos: datos || {}, nonce: nonce }));
-                fetch(APP_SYSTEM.apiAuthUrl, {
-                    method: "POST",
-                    mode: "no-cors",
-                    credentials: "omit",
-                    redirect: "manual",
-                    body: cuerpo
-                }).catch(function () { /* la respuesta es opaca; se consulta por JSONP */ });
+                const enviado = typeof navigator.sendBeacon === "function" &&
+                    navigator.sendBeacon(APP_SYSTEM.apiAuthUrl, cuerpo);
+                if (!enviado) {
+                    fetch(APP_SYSTEM.apiAuthUrl, {
+                        method: "POST",
+                        mode: "no-cors",
+                        credentials: "omit",
+                        body: cuerpo
+                    }).catch(function () { /* la respuesta es opaca; se consulta por JSONP */ });
+                }
             } catch (err) {
                 finalizar({ ok: false, mensaje: mensajeError });
                 return;
