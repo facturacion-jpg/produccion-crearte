@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "crearte_produccion": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

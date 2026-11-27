@@ -1,0 +1,11 @@
+# Blueprint opcional para Render
+# https://dashboard.render.com/blueprints
+services:
+  - type: web
+    name: produccion-crearte
+    env: static
+    branch: main
+    buildCommand: ""
+    staticPublishPath: .
+    # Si el index.html está dentro de una carpeta en el repo, descomenta y ajusta:
+    # rootDir: PRODUCCION CREARTE

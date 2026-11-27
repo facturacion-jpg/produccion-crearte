@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Firma de recibido | Crearte By Confeccionarte SAS</title>
+    <!-- Tailwind CSS compilado localmente (sin CDN) -->
+    <link rel="stylesheet" href="css/tailwind.css">
+    <!-- Tipografía Inter local -->
+    <link rel="stylesheet" href="css/fonts.css">
+    <!-- Estilos propios -->
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Iconos Lucide locales -->
+    <script src="js/vendor/lucide.min.js"></script>
+</head>
+<body class="text-zinc-900 antialiased selection:bg-yellow-200 selection:text-zinc-950 min-h-screen">
+    <header class="bg-zinc-950 text-white border-b-2 border-yellow-400">
+        <div class="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
+            <div class="bg-white px-3 py-1.5 rounded-xl shadow-sm flex items-center justify-center border border-zinc-200">
+                <img src="img/logo.png" alt="Crearte" class="h-9 w-auto object-contain" onerror="this.style.display='none'">
+            </div>
+            <div>
+                <div class="font-black text-sm sm:text-base uppercase tracking-tight">Crearte By Confeccionarte SAS</div>
+                <div class="text-[11px] text-zinc-400">Firma de recibido de materiales</div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto px-4 py-6 sm:py-10">
+        <div id="loading" class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-8 text-center text-sm text-zinc-500">
+            <i data-lucide="loader-circle" class="w-6 h-6 mx-auto mb-3 animate-spin text-yellow-500"></i>
+            Validando enlace de firma...
+        </div>
+
+        <div id="error-box" class="hidden bg-white rounded-2xl border border-rose-200 shadow-sm p-6 sm:p-8">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-lg text-zinc-950">No se puede firmar esta remisión</h1>
+                    <p id="error-message" class="text-sm text-zinc-600 mt-1"></p>
+                    <p class="text-xs text-zinc-400 mt-4">Si el problema continúa, solicita un nuevo enlace al área de Producción.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="signature-card" class="hidden bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+            <div class="bg-yellow-400 px-5 py-3 flex items-center justify-between gap-3">
+                <div>
+                    <div id="tipo-remision" class="text-[10px] font-black uppercase tracking-wider text-zinc-800">Remisión de salida inicial</div>
+                    <div id="ficha-id" class="font-mono font-black text-lg text-zinc-950"></div>
+                </div>
+                <span class="px-2.5 py-1 rounded-lg bg-zinc-950 text-yellow-400 text-[11px] font-extrabold">FIRMA DIGITAL</span>
+            </div>
+
+            <div class="p-5 sm:p-6 space-y-5">
+                <div id="ficha-info" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-zinc-50 border border-zinc-200 rounded-xl p-4"></div>
+
+                <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-xs text-zinc-800">
+                    <strong>Importante:</strong> al firmar confirmas que recibiste los materiales relacionados en esta remisión.
+                    Marca <strong>Recibido (Sí/No)</strong> y <strong>Estado</strong> en cada ítem antes de firmar.
+                    La planta tiene <strong>dos días hábiles</strong> para reportar novedades después de la recepción.
+                    <span id="deadline-text" class="block mt-1 font-semibold"></span>
+                </div>
+
+                <div id="items-confirmacion" class="hidden space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h2 class="text-sm font-extrabold text-zinc-950">Confirmación de materiales recibidos</h2>
+                            <p class="text-[11px] text-zinc-500 mt-0.5">Revisa cada material y marca si lo recibiste y en qué estado llegó.</p>
+                        </div>
+                        <span id="items-confirmacion-badge" class="hidden px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-extrabold"></span>
+                    </div>
+                    <div class="overflow-x-auto border border-zinc-200 rounded-xl">
+                        <table class="w-full min-w-[640px] text-left border-collapse text-xs">
+                            <thead class="bg-zinc-100 text-zinc-700 font-extrabold uppercase">
+                                <tr>
+                                    <th class="py-2 px-3">Material</th>
+                                    <th class="py-2 px-3">Cantidad</th>
+                                    <th class="py-2 px-3">Recibido (Sí/No) *</th>
+                                    <th class="py-2 px-3">Estado *</th>
+                                    <th class="py-2 px-3">Observación / novedad</th>
+                                </tr>
+                            </thead>
+                            <tbody id="items-confirmacion-body" class="divide-y divide-zinc-200"></tbody>
+                        </table>
+                    </div>
+                    <div id="items-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700"></div>
+                </div>
+
+                <div id="already-signed" class="hidden">
+                    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                        <div class="flex items-center gap-2 text-emerald-800 font-extrabold text-sm">
+                            <i data-lucide="check-circle" class="w-5 h-5"></i>
+                            Esta remisión ya fue firmada
+                        </div>
+                        <div id="signed-details" class="text-xs text-emerald-800 mt-2"></div>
+                    </div>
+                    <div class="mt-4 border border-zinc-200 rounded-xl p-3 bg-white">
+                        <img id="signed-image" alt="Firma registrada" class="w-full max-h-44 object-contain">
+                    </div>
+                </div>
+
+                <form id="signature-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-extrabold text-zinc-700 mb-1.5">Firma de quien recibe *</label>
+                        <div class="border-2 border-dashed border-zinc-300 rounded-xl bg-zinc-50 overflow-hidden">
+                            <canvas id="signature-pad" class="w-full h-44 sm:h-52 touch-none cursor-crosshair bg-white"></canvas>
+                        </div>
+                        <div class="flex items-center justify-between mt-2">
+                            <p class="text-[11px] text-zinc-500">Dibuja tu firma con el dedo o el mouse.</p>
+                            <button type="button" id="clear-signature" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-zinc-100 text-zinc-700 hover:bg-zinc-200">
+                                <i data-lucide="eraser" class="w-3.5 h-3.5"></i> Limpiar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-extrabold text-zinc-700 mb-1.5">Nombre completo *</label>
+                            <input type="text" id="signer-name" required autocomplete="name" placeholder="Nombre de quien recibe" class="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-extrabold text-zinc-700 mb-1.5">Cédula</label>
+                            <input type="text" id="signer-id" autocomplete="off" placeholder="Número de documento" class="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-extrabold text-zinc-700 mb-1.5">Cargo</label>
+                            <input type="text" id="signer-role" autocomplete="organization-title" placeholder="Ej: Jefe de producción" class="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-extrabold text-zinc-700 mb-1.5">Planta / Taller</label>
+                            <input type="text" id="signer-planta" readonly class="w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3.5 py-2.5 text-sm text-zinc-600 outline-none">
+                        </div>
+                    </div>
+
+                    <div id="form-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700"></div>
+
+                    <button type="submit" id="submit-signature" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-extrabold bg-zinc-950 text-yellow-400 hover:bg-zinc-800 transition-colors">
+                        <i data-lucide="pen-line" class="w-4 h-4"></i> Firmar y confirmar recibido
+                    </button>
+                    <p class="text-[10px] text-zinc-400 text-center">La firma queda registrada como evidencia digital con fecha y hora.</p>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/storage.js"></script>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const fichaId = (params.get("id") || "").trim();
+        const firmaToken = (params.get("token") || "").trim();
+        // tipo=despacho => firma de una solicitud de tela/insumos ya despachada.
+        const esDespacho = (params.get("tipo") || "").trim() === "despacho";
+        let fichaActual = null;
+        let firmaExistente = null;
+        let itemsParaConfirmar = [];
+        const OPCIONES_RECIBIDO = ["Sí", "No"];
+        const OPCIONES_ESTADO = ["Completo", "Incompleto", "Buen estado", "Con novedad", "No aplica"];
+        let canvas = null;
+        let ctx = null;
+        let dibujando = false;
+        let tieneTrazo = false;
+
+        const $ = id => document.getElementById(id);
+        const mostrar = id => $(id).classList.remove("hidden");
+        const ocultar = id => $(id).classList.add("hidden");
+
+        function iconos() {
+            if (window.lucide && typeof window.lucide.createIcons === "function") {
+                window.lucide.createIcons();
+            }
+        }
+
+        function fechaVisible(valor) {
+            const fecha = valor ? new Date(valor) : null;
+            if (!fecha || isNaN(fecha.getTime())) return "—";
+            return fecha.toLocaleString("es-CO", {
+                year: "numeric", month: "short", day: "2-digit",
+                hour: "2-digit", minute: "2-digit"
+            }).replace(/\.$/, "");
+        }
+
+        function mostrarError(mensaje) {
+            ocultar("loading");
+            ocultar("signature-card");
+            $("error-message").textContent = mensaje;
+            mostrar("error-box");
+            iconos();
+        }
+
+        async function cargarFicha() {
+            if (!/^[A-Za-z0-9_-]+$/.test(fichaId)) {
+                throw new Error("El identificador de la remisión no es válido.");
+            }
+            if (!firmaToken) {
+                throw new Error("El enlace no contiene el token de firma.");
+            }
+            if (!window.firebase || !dbRealtime) {
+                throw new Error("No se pudo conectar con la base de datos. Verifica tu conexión a internet.");
+            }
+
+            await dbAuthReady;
+
+            if (esDespacho) {
+                const solicitudesSnap = await dbRealtime.ref("crearte_produccion/produccion_solicitudes").once("value");
+                const solicitudesRaw = solicitudesSnap.val() || [];
+                const solicitudes = Array.isArray(solicitudesRaw) ? solicitudesRaw : Object.values(solicitudesRaw);
+                fichaActual = solicitudes.find(s => s && s.id === fichaId);
+                if (!fichaActual) {
+                    throw new Error("No encontramos el despacho. Puede que aún no se haya guardado en la plataforma.");
+                }
+                if (fichaActual.estado !== "Despachado") {
+                    throw new Error("Este material todavía no fue despachado. Espera a que Telas o Insumos confirme el despacho.");
+                }
+                const firmaSnap = await dbRealtime.ref("crearte_produccion/produccion_firmas_despachos/" + fichaId).once("value");
+                firmaExistente = firmaSnap.val();
+            } else {
+                const fichasSnap = await dbRealtime.ref("crearte_produccion/produccion_fichas").once("value");
+                const fichasRaw = fichasSnap.val() || [];
+                const fichas = Array.isArray(fichasRaw) ? fichasRaw : Object.values(fichasRaw);
+                fichaActual = fichas.find(f => f && f.id === fichaId);
+                if (!fichaActual) {
+                    throw new Error("No encontramos la remisión. Puede que aún no se haya guardado en la plataforma.");
+                }
+                const firmaSnap = await dbRealtime.ref("crearte_produccion/produccion_firmas/" + fichaId).once("value");
+                firmaExistente = firmaSnap.val();
+            }
+
+            if (!fichaActual.firmaToken || fichaActual.firmaToken !== firmaToken) {
+                throw new Error("El enlace de firma no es válido o fue reemplazado. Solicita uno nuevo.");
+            }
+
+            $("tipo-remision").textContent = esDespacho ? "Despacho de materiales" : "Remisión de salida inicial";
+            $("ficha-id").textContent = fichaActual.id;
+            $("ficha-info").innerHTML = esDespacho ? `
+                <div><span class="text-zinc-500 block">Planta / Taller</span><strong>${escapar(fichaActual.plantaNombre || "—")}</strong></div>
+                <div><span class="text-zinc-500 block">Remisión / Guía</span><strong>${escapar(fichaActual.despachoInfo?.remision || "—")}</strong></div>
+                <div><span class="text-zinc-500 block">Referencia / Lote</span><strong>${escapar(`${fichaActual.referencia || "—"} / ${fichaActual.lote || "—"}`)}</strong></div>
+                <div><span class="text-zinc-500 block">Fecha de despacho</span><strong>${escapar(fechaVisible(fichaActual.despachoInfo?.fecha || fichaActual.fecha))}</strong></div>
+                <div><span class="text-zinc-500 block">Área responsable</span><strong>${escapar(fichaActual.area === "TELA" ? "Bodega de Telas" : "Almacén de Insumos")}</strong></div>
+                <div><span class="text-zinc-500 block">N° de solicitud</span><strong>${escapar(fichaActual.id)}</strong></div>
+            ` : `
+                <div><span class="text-zinc-500 block">Planta / Taller</span><strong>${escapar(fichaActual.plantaNombre || "—")}</strong></div>
+                <div><span class="text-zinc-500 block">Referencia</span><strong>${escapar(fichaActual.referencia || "—")}</strong></div>
+                <div><span class="text-zinc-500 block">Prenda</span><strong>${escapar(fichaActual.prenda || "—")}</strong></div>
+                <div><span class="text-zinc-500 block">Fecha de remisión</span><strong>${escapar(fechaVisible(fichaActual.fecha))}</strong></div>
+            `;
+            $("signer-planta").value = fichaActual.plantaNombre || "";
+            $("deadline-text").textContent = esDespacho
+                ? `Despachado el ${fechaVisible(fichaActual.despachoInfo?.fecha || fichaActual.fecha)}. Motivo: ${fichaActual.motivo || "—"}.`
+                : fichaActual.fechaLimiteNovedades
+                    ? `Fecha límite para reportar novedades: ${fechaVisible(fichaActual.fechaLimiteNovedades)}.`
+                    : "";
+            itemsParaConfirmar = renderItemsConfirmacion(!firmaExistente);
+
+            ocultar("loading");
+            mostrar("signature-card");
+
+            if (firmaExistente) {
+                mostrarFirmaExistente();
+            } else {
+                configurarCanvas();
+                mostrar("signature-form");
+            }
+            iconos();
+        }
+
+        function escapar(valor) {
+            return String(valor ?? "").replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+            }[c]));
+        }
+
+        function opcionesSelect(valores, seleccionado) {
+            const actual = seleccionado || "";
+            return `<option value="" ${actual ? "" : "selected"}>Elegir</option>` +
+                valores.map(v => `<option value="${escapar(v)}" ${actual === v ? "selected" : ""}>${escapar(v)}</option>`).join("");
+        }
+
+        function buscarConfirmado(confirmados, indice, item) {
+            if (!Array.isArray(confirmados)) return null;
+            return confirmados.find(c => c && (
+                c.index === indice ||
+                (!("index" in c) && String(c.material || "") === String(item.material || item.desc || ""))
+            )) || null;
+        }
+
+        // Muestra los ítems de la orden de salida.Editable = true mientras se firma;
+        // después se muestran los valores que la planta confirmó.
+        function renderItemsConfirmacion(editable) {
+            const lista = Array.isArray(fichaActual && fichaActual.items) ? fichaActual.items : [];
+            if (!lista.length) {
+                ocultar("items-confirmacion");
+                return [];
+            }
+            mostrar("items-confirmacion");
+            const confirmados = editable ? [] : (firmaExistente && firmaExistente.items) || [];
+            $("items-confirmacion-body").innerHTML = lista.map((it, idx) => {
+                const conf = buscarConfirmado(confirmados, idx, it);
+                const recibido = conf ? (conf.recibido || "") : (it.recibido || "");
+                const estado = conf ? (conf.estado || "") : (it.estado || "");
+                const plantaObs = conf ? (conf.observacion || "") : "";
+                const material = it.material || it.desc || "—";
+                const cantidadDespachada = esDespacho ? (it.cantDespachada ?? it.cant) : it.cant;
+                const cantidad = `${cantidadDespachada ?? "—"} ${it.unidad || ""}`.trim();
+                const referencia = it.observacion || (it.color ? `Color/Lote: ${it.color}` : "");
+                const detalle = referencia ? `<div class="text-[11px] font-normal text-zinc-500">${escapar(referencia)}</div>` : "";
+
+                if (!editable) {
+                    return `
+                        <tr>
+                            <td class="py-2 px-3 font-extrabold text-zinc-900">${escapar(material)}${detalle}</td>
+                            <td class="py-2 px-3">${escapar(cantidad)}</td>
+                            <td class="py-2 px-3 font-bold ${recibido === "No" ? "text-rose-700" : "text-emerald-700"}">${escapar(recibido || "—")}</td>
+                            <td class="py-2 px-3">${escapar(estado || "—")}</td>
+                            <td class="py-2 px-3 text-zinc-600">${escapar(plantaObs || "—")}</td>
+                        </tr>
+                    `;
+                }
+                return `
+                    <tr data-item-index="${idx}">
+                        <td class="py-2 px-3 font-extrabold text-zinc-900">${escapar(material)}${detalle}</td>
+                        <td class="py-2 px-3">${escapar(cantidad)}</td>
+                        <td class="py-2 px-3">
+                            <select data-item-recibido class="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs focus:ring-2 focus:ring-yellow-400 outline-none">
+                                ${opcionesSelect(OPCIONES_RECIBIDO, recibido)}
+                            </select>
+                        </td>
+                        <td class="py-2 px-3">
+                            <select data-item-estado class="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs focus:ring-2 focus:ring-yellow-400 outline-none">
+                                ${opcionesSelect(OPCIONES_ESTADO, estado)}
+                            </select>
+                        </td>
+                        <td class="py-2 px-3">
+                            <input type="text" data-item-obs value="${escapar(plantaObs)}" placeholder="Opcional" class="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs focus:ring-2 focus:ring-yellow-400 outline-none">
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+
+            const badge = $("items-confirmacion-badge");
+            if (!editable && firmaExistente && firmaExistente.itemsConfirmadosAt) {
+                badge.textContent = `Confirmado: ${fechaVisible(firmaExistente.itemsConfirmadosAt)}`;
+                badge.classList.remove("hidden");
+            } else {
+                badge.classList.add("hidden");
+            }
+            return lista;
+        }
+
+        function filasConfirmacion() {
+            return Array.from(document.querySelectorAll("#items-confirmacion-body tr[data-item-index]"));
+        }
+
+        function leerItemsConfirmacion() {
+            return filasConfirmacion().map(fila => {
+                const idx = parseInt(fila.getAttribute("data-item-index"), 10) || 0;
+                const it = itemsParaConfirmar[idx] || {};
+                return {
+                    index: idx,
+                    material: it.material || it.desc || "",
+                    cant: it.cant ?? "",
+                    unidad: it.unidad || "",
+                    recibido: fila.querySelector("[data-item-recibido]").value,
+                    estado: fila.querySelector("[data-item-estado]").value,
+                    observacion: (fila.querySelector("[data-item-obs]").value || "").trim()
+                };
+            });
+        }
+
+        function itemsConfirmacionCompletos() {
+            const filas = filasConfirmacion();
+            if (itemsParaConfirmar.length && !filas.length) return false;
+            return filas.every(fila => Boolean(
+                fila.querySelector("[data-item-recibido]").value &&
+                fila.querySelector("[data-item-estado]").value
+            ));
+        }
+
+        function mostrarFirmaExistente() {
+            ocultar("signature-form");
+            mostrar("already-signed");
+            renderItemsConfirmacion(false);
+            $("signed-details").innerHTML = `
+                <div><strong>${escapar(firmaExistente.nombre || "Firmante")}</strong>${firmaExistente.cedula ? ` · C.C. ${escapar(firmaExistente.cedula)}` : ""}</div>
+                <div>${escapar(firmaExistente.cargo || "")}</div>
+                <div>Firmado: ${escapar(fechaVisible(firmaExistente.fecha))}</div>
+            `;
+            if (/^data:image\//.test(firmaExistente.firmaDataUrl || "")) {
+                $("signed-image").src = firmaExistente.firmaDataUrl;
+            } else {
+                $("signed-image").classList.add("hidden");
+            }
+        }
+
+        function configurarCanvas() {
+            canvas = $("signature-pad");
+            ctx = canvas.getContext("2d");
+            const ratio = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = Math.max(600, Math.round(rect.width * ratio));
+            canvas.height = Math.max(240, Math.round(rect.height * ratio));
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = 3 * ratio;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.strokeStyle = "#111827";
+            tieneTrazo = false;
+
+            const punto = evento => {
+                const r = canvas.getBoundingClientRect();
+                return {
+                    x: (evento.clientX - r.left) * (canvas.width / r.width),
+                    y: (evento.clientY - r.top) * (canvas.height / r.height)
+                };
+            };
+
+            canvas.addEventListener("pointerdown", evento => {
+                evento.preventDefault();
+                dibujando = true;
+                canvas.setPointerCapture(evento.pointerId);
+                const p = punto(evento);
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x + 0.1, p.y + 0.1);
+                ctx.stroke();
+                tieneTrazo = true;
+            });
+
+            canvas.addEventListener("pointermove", evento => {
+                if (!dibujando) return;
+                evento.preventDefault();
+                const p = punto(evento);
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+            });
+
+            const terminar = evento => {
+                if (!dibujando) return;
+                dibujando = false;
+                try { canvas.releasePointerCapture(evento.pointerId); } catch (e) {}
+            };
+            canvas.addEventListener("pointerup", terminar);
+            canvas.addEventListener("pointercancel", terminar);
+            canvas.addEventListener("pointerleave", terminar);
+        }
+
+        function limpiarFirma() {
+            if (!ctx || !canvas) return;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            tieneTrazo = false;
+        }
+
+        async function firmar(evento) {
+            evento.preventDefault();
+            const errorBox = $("form-error");
+            errorBox.classList.add("hidden");
+            $("items-error").classList.add("hidden");
+
+            const nombre = $("signer-name").value.trim();
+            const cedula = $("signer-id").value.trim();
+            const cargo = $("signer-role").value.trim();
+
+            if (!nombre) {
+                errorBox.textContent = "Escribe el nombre completo de quien recibe.";
+                errorBox.classList.remove("hidden");
+                return;
+            }
+            if (!tieneTrazo) {
+                errorBox.textContent = "Dibuja la firma en el recuadro antes de confirmar.";
+                errorBox.classList.remove("hidden");
+                return;
+            }
+            if (!itemsConfirmacionCompletos()) {
+                $("items-error").textContent = "Marca Recibido (Sí/No) y Estado en todos los materiales antes de firmar.";
+                $("items-error").classList.remove("hidden");
+                return;
+            }
+
+            const itemsConfirmados = leerItemsConfirmacion();
+            const fechaConfirmacion = new Date().toISOString();
+            const boton = $("submit-signature");
+            boton.disabled = true;
+            boton.innerHTML = '<i data-lucide="loader-circle" class="w-4 h-4 animate-spin"></i> Guardando firma...';
+            iconos();
+
+            try {
+                await dbAuthReady;
+                // Los despachos se guardan en un nodo aparte para no mezclarlos
+                // con la firma de la salida inicial.
+                const ruta = esDespacho
+                    ? "crearte_produccion/produccion_firmas_despachos/" + fichaId
+                    : "crearte_produccion/produccion_firmas/" + fichaId;
+                const ref = dbRealtime.ref(ruta);
+                const actual = await ref.once("value");
+                if (actual.val()) throw new Error("Esta remisión ya fue firmada. No se puede reemplazar la evidencia.");
+
+                const firma = {
+                    fichaId: fichaId,
+                    solicitudId: esDespacho ? fichaId : "",
+                    nombre: nombre,
+                    cedula: cedula,
+                    cargo: cargo,
+                    plantaNombre: fichaActual.plantaNombre || "",
+                    firmaDataUrl: canvas.toDataURL("image/png"),
+                    fecha: new Date().toISOString(),
+                    // Los ítems confirmados por la planta viajan con la firma.
+                    // No reescribimos la ficha/solicitud completa para no
+                    // sobrescribir cambios que Gestión Central haga al mismo tiempo.
+                    items: itemsConfirmados,
+                    itemsConfirmadosAt: fechaConfirmacion,
+                    userAgent: String(navigator.userAgent || "").slice(0, 250)
+                };
+                await ref.set(firma);
+                if (typeof DataStore !== "undefined" && typeof DataStore.notificarPanelCentral === "function") {
+                    DataStore.notificarPanelCentral(esDespacho ? "FIRMA_DESPACHO_RECIBIDO" : "FIRMA_RECIBIDO_ITEMS", {
+                        fichaId: fichaId,
+                        solicitudId: esDespacho ? fichaId : "",
+                        remision: esDespacho ? (fichaActual.despachoInfo?.remision || "") : "",
+                        items: itemsConfirmados,
+                        fecha: fechaConfirmacion
+                    });
+                }
+                firmaExistente = firma;
+                mostrarFirmaExistente();
+                iconos();
+            } catch (err) {
+                errorBox.textContent = String(err && err.message ? err.message : err);
+                errorBox.classList.remove("hidden");
+                boton.disabled = false;
+                boton.innerHTML = '<i data-lucide="pen-line" class="w-4 h-4"></i> Firmar y confirmar recibido';
+                iconos();
+            }
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            iconos();
+            $("clear-signature").addEventListener("click", limpiarFirma);
+            $("signature-form").addEventListener("submit", firmar);
+            cargarFicha().catch(err => mostrarError(String(err && err.message ? err.message : err)));
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Producción | Crearte By Confeccionarte SAS</title>
+    <!-- Tailwind CSS compilado localmente (sin CDN) -->
+    <link rel="stylesheet" href="css/tailwind.css">
+    <!-- Tipografía Inter local -->
+    <link rel="stylesheet" href="css/fonts.css">
+    <!-- Estilos propios -->
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Iconos Lucide locales -->
+    <script src="js/vendor/lucide.min.js"></script>
+</head>
+<body class="text-zinc-900 antialiased selection:bg-yellow-200 selection:text-zinc-950">
+
+    <!-- ===================================================================== -->
+    <!-- LOGIN / ALTA DE USUARIOS (HOJA DE GOOGLE SHEETS)                      -->
+    <!-- ===================================================================== -->
+    <div id="login-overlay" class="hidden fixed inset-0 z-50 items-center justify-center bg-zinc-950/70 p-3 no-print">
+        <div class="w-full max-w-md max-h-[94vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border-t-4 border-yellow-400">
+            <div class="bg-zinc-950 text-white px-5 py-4 flex items-center gap-3">
+                <div class="bg-white p-1.5 rounded-xl">
+                    <img src="img/logo.png" alt="Crearte" class="h-8 w-auto object-contain" onerror="this.style.display='none'">
+                </div>
+                <div>
+                    <div class="font-black text-sm uppercase tracking-tight text-yellow-400">Producción · Acceso</div>
+                    <p class="text-[11px] text-zinc-400">Crearte By Confeccionarte SAS</p>
+                </div>
+            </div>
+
+            <form id="login-form" onsubmit="Auth.login(event)" class="p-5 sm:p-6 space-y-4">
+                <div>
+                    <h1 class="font-extrabold text-zinc-950 text-lg">Iniciar sesión</h1>
+                    <p class="text-xs text-zinc-500 mt-0.5">Usa el usuario y la clave registrados en Google Sheets.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-extrabold text-zinc-700 mb-1.5">Usuario</label>
+                    <input type="text" id="login-usuario" autocomplete="username" required placeholder="Ej: bodega.telas" class="w-full rounded-xl border border-zinc-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-extrabold text-zinc-700 mb-1.5">Clave</label>
+                    <input type="password" id="login-clave" autocomplete="current-password" required placeholder="••••••••" class="w-full rounded-xl border border-zinc-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                </div>
+                <div id="login-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700"></div>
+                <button type="submit" id="login-submit" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-extrabold bg-zinc-950 text-yellow-400 hover:bg-zinc-800">
+                    <i data-lucide="log-in" class="w-4 h-4"></i> Entrar
+                </button>
+                <div id="login-estado" class="text-[11px] text-zinc-400 text-center"></div>
+                <button type="button" onclick="Auth.mostrarCrearUsuario()" class="w-full text-xs font-bold text-zinc-600 hover:text-zinc-950 underline decoration-yellow-400 decoration-2">
+                    Crear usuario y clave
+                </button>
+            </form>
+
+            <form id="crear-usuario-form" onsubmit="Auth.crearUsuario(event)" class="hidden p-5 sm:p-6 space-y-4 border-t border-zinc-100">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-extrabold text-zinc-950 text-sm">Nuevo usuario</h2>
+                        <p class="text-[11px] text-zinc-500">El rol define lo que puede ver y editar.</p>
+                    </div>
+                    <button type="button" onclick="Auth.ocultarCrearUsuario()" class="p-2 rounded-lg text-zinc-400 hover:text-rose-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input type="text" id="new-usuario" required placeholder="Usuario (sin espacios)" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm">
+                    <input type="text" id="new-nombre" required placeholder="Nombre completo" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm">
+                    <input type="email" id="new-correo" placeholder="Correo (opcional)" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm">
+                    <select id="new-rol" required class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-bold">
+                        <option value="LECTURA">Solo consulta (no edita)</option>
+                        <option value="TELAS">Bodega de Telas — despachos</option>
+                        <option value="INSUMOS">Almacén de Insumos — despachos</option>
+                        <option value="FICHAS">Envío de fichas y salidas</option>
+                        <option value="PLANTA">Planta externa (una planta)</option>
+                        <option value="ADMIN">Administrador (todo)</option>
+                    </select>
+                    <select id="new-planta" class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                        <option value="">Planta (solo para rol PLANTA)</option>
+                    </select>
+                    <input type="password" id="new-clave" required minlength="6" placeholder="Clave (mínimo 6)" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm">
+                </div>
+                <div id="new-setup-box" class="p-3 rounded-xl bg-yellow-50 border border-yellow-300">
+                    <label class="block text-xs font-extrabold text-zinc-800 mb-1">Clave de configuración (solo para el primer usuario)</label>
+                    <input type="password" id="new-setup-key" placeholder="USER_SETUP_KEY del Apps Script" class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                    <p class="text-[10px] text-zinc-500 mt-1">La obtienes al ejecutar <span class="font-mono">inicializarAuth()</span> en el editor de Apps Script.</p>
+                </div>
+                <div id="crear-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700"></div>
+                <button type="submit" id="crear-submit" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-extrabold bg-yellow-400 text-zinc-950 hover:bg-yellow-500">
+                    <i data-lucide="user-plus" class="w-4 h-4"></i> Crear usuario
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- BARRA SUPERIOR CORPORATIVA (NEGRO INTENSO + AMARILLO CREARTE)         -->
+    <!-- ===================================================================== -->
+    <header class="bg-zinc-950 text-white border-b-2 border-yellow-400 sticky top-0 z-40 shadow-lg no-print">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            
+            <!-- Logotipo e Identidad -->
+            <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white px-3 py-1.5 rounded-xl shadow-sm flex items-center justify-center border border-zinc-200">
+                        <img src="img/logo.png" alt="Crearte By Confeccionarte SAS" class="h-8 sm:h-9 w-auto object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+                        <span class="hidden font-black text-zinc-950 text-sm tracking-tight">CRE<span class="text-yellow-500">ARTE</span></span>
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-black text-base sm:text-lg tracking-tight text-yellow-400 uppercase">Producción</span>
+                            <span class="text-[11px] font-medium text-zinc-400 hidden sm:inline">NIT. 901.367.620-0</span>
+                        </div>
+                        <p class="text-[11px] text-zinc-400 hidden md:block">Control de Fichas Técnicas, Salidas y Plantas Externas</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 lg:ml-2">
+                    <span id="role-badge-header" class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-yellow-400/15 text-yellow-400 border border-yellow-400/40">
+                        Gestión Central
+                    </span>
+                    <div id="auth-user-box" class="hidden items-center gap-2">
+                        <span id="auth-rol-chip" class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/15 text-white border border-white/30"></span>
+                        <span id="auth-nombre" class="text-[11px] font-semibold text-zinc-300 hidden sm:inline"></span>
+                        <button type="button" onclick="Auth.logout()" title="Cerrar sesión" class="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conmutador de Portales -->
+            <div class="grid grid-cols-2 sm:flex items-center gap-1.5 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+                <button type="button" onclick="switchRole('central')" id="role-btn-central" class="flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg text-xs font-extrabold transition-all bg-yellow-400 text-zinc-950 shadow-sm">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4 flex-shrink-0"></i>
+                    <span class="truncate">1. Gestión Central</span>
+                    <span id="badge-pendientes-count" class="px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-950 text-yellow-400 font-black">0</span>
+                </button>
+
+                <button type="button" onclick="switchRole('planta')" id="role-btn-planta" class="flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all text-zinc-300 hover:text-white hover:bg-zinc-800">
+                    <i data-lucide="factory" class="w-4 h-4 flex-shrink-0"></i>
+                    <span class="truncate">2. Planta Externa</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- CONTENEDOR PRINCIPAL                                                  -->
+    <!-- ===================================================================== -->
+    <main class="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-5 no-print">
+
+        <!-- ================================================================= -->
+        <!-- VISTA 1: GESTIÓN CENTRAL (FICHAS, SALIDAS Y DESPACHOS)            -->
+        <!-- ================================================================= -->
+        <div id="role-view-central" class="role-view space-y-5">
+            
+            <!-- Encabezado y Sub-navegación -->
+            <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-5 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-l-4 border-l-yellow-400">
+                <div>
+                    <h1 class="text-lg sm:text-xl font-extrabold text-zinc-950">Gestión Central de Producción</h1>
+                    <p class="text-xs text-zinc-500 mt-0.5">Crearte By Confeccionarte SAS • Asignación de fichas, salidas y despachos a talleres.</p>
+                </div>
+                <div class="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2">
+                    <button type="button" onclick="switchSubTab('cen', 'enviar')" id="cen-tab-enviar" class="cen-subtab inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-xl text-xs font-extrabold bg-zinc-950 text-yellow-400 shadow-sm transition-all">
+                        <i data-lucide="send" class="w-3.5 h-3.5"></i> Enviar Ficha + Salida
+                    </button>
+                    <button type="button" onclick="switchSubTab('cen', 'despachos')" id="cen-tab-despachos" class="cen-subtab inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-all">
+                        <i data-lucide="warehouse" class="w-3.5 h-3.5"></i> Solicitudes y Despachos
+                        <span id="subtab-pend-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-yellow-400 text-zinc-950 font-black">0</span>
+                    </button>
+                    <button type="button" onclick="switchSubTab('cen', 'config')" id="cen-tab-config" class="cen-subtab inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-all">
+                        <i data-lucide="settings" class="w-3.5 h-3.5"></i> Destinatarios y Plantas
+                    </button>
+                </div>
+            </div>
+
+            <!-- SUB-VISTA 1A: ENVÍO DE FICHA TÉCNICA + SALIDA -->
+            <section id="cen-panel-enviar" class="cen-panel space-y-5">
+                <div id="ficha-form-card" class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 sm:p-6">
+                    <div class="flex items-center gap-3 pb-4 mb-5 border-b border-zinc-100">
+                        <div class="p-2.5 bg-zinc-950 text-yellow-400 rounded-xl flex-shrink-0">
+                            <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-extrabold text-zinc-950 text-sm sm:text-base">Nueva Remisión: Ficha Técnica + Salida Inicial</h2>
+                            <p class="text-xs text-zinc-500">Asigna una referencia a una planta externa y autoriza la entrega inicial de materiales.</p>
+                        </div>
+                    </div>
+
+                    <form id="form-ficha-salida" onsubmit="handlePreviewFichaSalida(event)" class="space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-zinc-700 mb-1.5">Planta Externa Destino *</label>
+                                <select id="fs-planta-id" required onchange="syncPlantaEmail()" class="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 outline-none"></select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1.5">Referencia Prenda *</label>
+                                <input type="text" id="fs-ref" required placeholder="Ej: REF-2026-501" class="w-full rounded-xl border border-zinc-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1.5">Unidades a Producir *</label>
+                                <input type="number" id="fs-cantidad-prendas" required min="1" placeholder="Ej: 400" class="w-full rounded-xl border border-zinc-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-zinc-700 mb-1.5">Descripción de la Prenda / Estilo *</label>
+                                <input type="text" id="fs-prenda" required placeholder="Ej: Buso Hoodie Algodón Perchado" class="w-full rounded-xl border border-zinc-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1.5">Línea / Colección *</label>
+                                <input type="text" id="fs-cliente" required placeholder="Ej: Crearte - Colección 2026" class="w-full rounded-xl border border-zinc-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-yellow-50/60 p-4 rounded-xl border border-yellow-300/80">
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-800 mb-1.5">Correo de Contacto Planta Externa *</label>
+                                <input type="email" id="fs-email" required class="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                                <p class="text-[11px] text-zinc-600 mt-1">Se enviará copia (CC) automática a Bodega de Telas e Insumos.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-800 mb-1.5">Ficha Técnica (PDF o Enlace Drive) *</label>
+                                <div class="flex flex-col gap-2">
+                                    <label class="cursor-pointer flex items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-400 bg-white hover:bg-yellow-50 px-3 py-2 text-xs font-bold text-zinc-900 transition-colors">
+                                        <i data-lucide="paperclip" class="w-4 h-4 text-yellow-600 flex-shrink-0"></i>
+                                        <span id="fs-file-label" class="truncate max-w-[160px]">Seleccionar PDF</span>
+                                        <input type="file" id="fs-file-input" accept=".pdf,.dxf,.png,.jpg" class="hidden" onchange="handleFileSelect(this)">
+                                    </label>
+                                    <input type="text" id="fs-file-url" placeholder="O pegar enlace Drive..." class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs focus:ring-2 focus:ring-yellow-400 outline-none">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-800 mb-1.5">Salida de Insumos (PDF o Enlace Drive)</label>
+                                <div class="flex flex-col gap-2">
+                                    <label class="cursor-pointer flex items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-400 bg-white hover:bg-yellow-50 px-3 py-2 text-xs font-bold text-zinc-900 transition-colors">
+                                        <i data-lucide="package" class="w-4 h-4 text-yellow-600 flex-shrink-0"></i>
+                                        <span id="fs-insumos-file-label" class="truncate max-w-[160px]">Seleccionar PDF</span>
+                                        <input type="file" id="fs-insumos-file-input" accept=".pdf,.dxf,.png,.jpg" class="hidden" onchange="handleFileSelect(this, 'insumos')">
+                                    </label>
+                                    <input type="text" id="fs-insumos-file-url" placeholder="O pegar enlace Drive..." class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs focus:ring-2 focus:ring-yellow-400 outline-none">
+                                </div>
+                                <p class="text-[11px] text-zinc-600 mt-1">Opcional. Se adjunta junto a la ficha técnica.</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                <div>
+                                    <h3 class="text-sm font-extrabold text-zinc-950">Orden de Salida Inicial (Telas e Insumos)</h3>
+                                    <p class="text-xs text-zinc-500">Materiales incluidos en el despacho inicial junto con la ficha técnica.</p>
+                                </div>
+                                <button type="button" onclick="addMaterialRow('fs-items-body')" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-950 text-yellow-400 hover:bg-zinc-800">
+                                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Añadir otro material
+                                </button>
+                            </div>
+
+                            <datalist id="materiales-entrega-list">
+                                <option value="Bultos de piezas cortadas"></option>
+                                <option value="Plantillas y Molderia"></option>
+                                <option value="Set de tallas"></option>
+                                <option value="Retazo de tela"></option>
+                                <option value="Insumos y etiquetas"></option>
+                                <option value="Muestra Fisica"></option>
+                            </datalist>
+
+                            <div class="overflow-x-auto border border-zinc-200 rounded-xl">
+                                <table class="w-full min-w-[900px] text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-zinc-900 text-[11px] font-bold uppercase text-yellow-400">
+                                            <th class="py-2.5 px-3 min-w-[220px]">Material entregado</th>
+                                            <th class="py-2.5 px-3 w-24">Cantidad</th>
+                                            <th class="py-2.5 px-3 w-32">Unidad</th>
+                                            <th class="py-2.5 px-3 w-32">Recibido (Sí/No)</th>
+                                            <th class="py-2.5 px-3 w-36">Estado</th>
+                                            <th class="py-2.5 px-3 min-w-[180px]">Observación</th>
+                                            <th class="py-2.5 px-3 w-12 text-center"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fs-items-body" class="divide-y divide-zinc-100 text-sm"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 mb-1.5">Especificaciones Técnicas / Notas de Producción</label>
+                            <textarea id="fs-notas" rows="2" placeholder="Ej: Verificar tensión de puntada y entregar muestra física antes de lote." class="w-full rounded-xl border border-zinc-300 px-3.5 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none"></textarea>
+                        </div>
+
+                        <div class="flex justify-end pt-3 border-t border-zinc-100">
+                            <button type="submit" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 sm:py-2.5 rounded-xl text-sm font-extrabold bg-yellow-400 text-zinc-950 hover:bg-yellow-500 shadow-md transition-all">
+                                <i data-lucide="mail-check" class="w-4 h-4"></i>
+                                Previsualizar Correo y Enviar a Planta
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Historial de Fichas con Buscador, Avance y Exportar CSV -->
+                <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+                    <div class="p-4 sm:p-5 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h3 class="font-extrabold text-zinc-950">Historial de Órdenes y Avance de Confección</h3>
+                            <p class="text-xs text-zinc-500">Consulta remisiones imprimibles y unidades terminadas por planta</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <div class="relative flex-1 sm:w-56">
+                                <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                                <input type="text" id="search-fichas-input" oninput="renderCentralView()" placeholder="Buscar Ref, prenda o taller..." class="w-full pl-8 pr-3 py-2 rounded-xl border border-zinc-300 text-xs focus:ring-2 focus:ring-yellow-400 outline-none">
+                            </div>
+                            <button type="button" onclick="exportarFichasCSV()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-950 text-white hover:bg-zinc-800">
+                                <i data-lucide="download" class="w-3.5 h-3.5 text-yellow-400"></i> Excel (CSV)
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[780px] text-left border-collapse">
+                            <thead>
+                                <tr class="bg-zinc-50 border-b border-zinc-200 text-[11px] font-bold uppercase text-zinc-600">
+                                    <th class="py-3 px-4">Orden / Fecha</th>
+                                    <th class="py-3 px-4">Planta Externa</th>
+                                    <th class="py-3 px-4">Referencia / Prenda</th>
+                                    <th class="py-3 px-4">Avance Producción</th>
+                                    <th class="py-3 px-4">Ficha Técnica</th>
+                                    <th class="py-3 px-4 text-right">Acciones / Remisión</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ing-fichas-tbody" class="divide-y divide-zinc-100 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SUB-VISTA 1B: BANDEJA DE SOLICITUDES Y DESPACHOS -->
+            <section id="cen-panel-despachos" class="cen-panel hidden space-y-5">
+                
+                <!-- KPIs -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div class="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm border-b-4 border-b-zinc-950">
+                        <p class="text-[11px] font-bold text-zinc-400 uppercase">Órdenes Activas</p>
+                        <h3 id="ing-kpi-fichas" class="text-2xl font-black text-zinc-950 mt-1">0</h3>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm border-b-4 border-b-yellow-400">
+                        <p class="text-[11px] font-bold text-yellow-700 uppercase">Pendientes Telas</p>
+                        <h3 id="ing-kpi-pend-telas" class="text-2xl font-black text-yellow-600 mt-1">0</h3>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm border-b-4 border-b-amber-500">
+                        <p class="text-[11px] font-bold text-amber-700 uppercase">Pendientes Insumos</p>
+                        <h3 id="ing-kpi-pend-insumos" class="text-2xl font-black text-amber-600 mt-1">0</h3>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm border-b-4 border-b-emerald-500">
+                        <p class="text-[11px] font-bold text-emerald-700 uppercase">Total Despachados</p>
+                        <h3 id="ing-kpi-despachados" class="text-2xl font-black text-emerald-600 mt-1">0</h3>
+                    </div>
+                </div>
+
+                <!-- Filtros por Bodega -->
+                <div class="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" onclick="setBodegaArea('ALL')" id="bod-filter-ALL" class="bod-area-btn px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all bg-zinc-950 text-yellow-400 shadow-sm">
+                            Todas
+                        </button>
+                        <button type="button" onclick="setBodegaArea('TELA')" id="bod-filter-TELA" class="bod-area-btn flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-yellow-50 text-zinc-900 border border-yellow-300 hover:bg-yellow-100">
+                            <i data-lucide="layers" class="w-3.5 h-3.5 text-yellow-600"></i> Solo Telas
+                        </button>
+                        <button type="button" onclick="setBodegaArea('INSUMO')" id="bod-filter-INSUMO" class="bod-area-btn flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-zinc-100 text-zinc-800 border border-zinc-300 hover:bg-zinc-200">
+                            <i data-lucide="component" class="w-3.5 h-3.5 text-zinc-700"></i> Solo Insumos
+                        </button>
+                    </div>
+
+                    <select id="bod-status-filter" onchange="renderBodegaView()" class="text-xs rounded-xl border border-zinc-300 bg-zinc-50 px-3.5 py-2.5 sm:py-2 font-bold text-zinc-800 outline-none">
+                        <option value="Pendiente">Pendientes por Despachar</option>
+                        <option value="Despachado">Ya Despachados</option>
+                        <option value="ALL">Todos los Estados</option>
+                    </select>
+                </div>
+
+                <div id="bodega-responsable-banner" class="p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3"></div>
+
+                <!-- Tabla de Despachos -->
+                <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+                    <div class="p-4 sm:p-5 border-b border-zinc-100">
+                        <h3 class="font-extrabold text-zinc-950">Bandeja de Despacho de Materiales</h3>
+                        <p class="text-xs text-zinc-500">Procesa los envíos y genera la remisión oficial con número de guía.</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[750px] text-left border-collapse">
+                            <thead>
+                                <tr class="bg-zinc-900 text-[11px] font-bold uppercase text-yellow-400">
+                                    <th class="py-3.5 px-4">Ticket / Urgencia</th>
+                                    <th class="py-3.5 px-4">Planta Solicitante</th>
+                                    <th class="py-3.5 px-4">Responsable</th>
+                                    <th class="py-3.5 px-4">Referencia / Motivo</th>
+                                    <th class="py-3.5 px-4">Materiales</th>
+                                    <th class="py-3.5 px-4">Estado</th>
+                                    <th class="py-3.5 px-4 text-right">Acción / Remisión</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bodega-tbody" class="divide-y divide-zinc-100 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SUB-VISTA 1C: CONFIGURACIÓN DE DESTINATARIOS Y PLANTAS -->
+            <section id="cen-panel-config" class="cen-panel hidden space-y-5">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <div class="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 sm:p-6">
+                        <h2 class="font-extrabold text-zinc-950 text-lg mb-1">Directorio de Encargados y Notificaciones</h2>
+                        <p class="text-xs text-zinc-500 mb-5">Configura los correos que reciben automáticamente las solicitudes de Telas e Insumos.</p>
+
+                        <form onsubmit="saveConfig(event)" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="p-4 rounded-xl bg-yellow-50/70 border border-yellow-300 space-y-3">
+                                    <h3 class="font-extrabold text-sm text-zinc-950 flex items-center gap-2">
+                                        <i data-lucide="layers" class="w-4 h-4 text-yellow-600"></i> Bodega de Telas
+                                    </h3>
+                                    <input type="text" id="cfg-tela-nombre" required placeholder="Nombre responsable" class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                                    <input type="email" id="cfg-tela-email" required placeholder="Correo electrónico" class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-zinc-600 mb-1">Nombre para la firma automática del despachador</label>
+                                        <input type="text" id="cfg-despachador-nombre" placeholder="Ej: María Gómez - Bodega de Telas" class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                                    </div>
+                                </div>
+
+                                <div class="p-4 rounded-xl bg-zinc-100 border border-zinc-300 space-y-3">
+                                    <h3 class="font-extrabold text-sm text-zinc-950 flex items-center gap-2">
+                                        <i data-lucide="component" class="w-4 h-4 text-zinc-700"></i> Almacén de Insumos
+                                    </h3>
+                                    <input type="text" id="cfg-insumo-nombre" required placeholder="Nombre responsable" class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                                    <input type="email" id="cfg-insumo-email" required placeholder="Correo electrónico" class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                                </div>
+                            </div>
+
+                            <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-3">
+                                <h3 class="font-extrabold text-sm text-zinc-950 flex items-center gap-2">
+                                    <i data-lucide="mail" class="w-4 h-4 text-yellow-600"></i> Emisor Ingeniería / Copia de Seguridad (CC)
+                                </h3>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <input type="text" id="cfg-ing-nombre" required class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                                    <input type="email" id="cfg-ing-email" required class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                                </div>
+                            </div>
+
+                            <div class="p-4 rounded-xl bg-yellow-50/70 border border-yellow-300 space-y-3">
+                                <h3 class="font-extrabold text-sm text-zinc-950 flex items-center gap-2">
+                                    <i data-lucide="link" class="w-4 h-4 text-yellow-700"></i> Enlaces de firma electrónica
+                                </h3>
+                                <p class="text-[11px] text-zinc-600">Pega aquí la URL pública del sitio, por ejemplo <span class="font-mono">https://produccion-crearte.onrender.com</span>. Se usa para que el correo llegue con el enlace de <span class="font-bold">firmar.html</span>.</p>
+                                <input type="url" id="cfg-public-base-url" placeholder="https://tu-sitio.onrender.com" class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                            </div>
+
+                            <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-300 space-y-3">
+                                <h3 class="font-extrabold text-sm text-zinc-950 flex items-center gap-2">
+                                    <i data-lucide="wallet" class="w-4 h-4 text-emerald-700"></i> Contabilidad — cobros por material fuera de plazo
+                                </h3>
+                                <p class="text-[11px] text-zinc-600">Recibe automáticamente el aviso de cobro cuando el encargado de Telas o Insumos autoriza el despacho de una solicitud posterior a los dos días hábiles.</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <input type="text" id="cfg-contabilidad-nombre" placeholder="Nombre del área" class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                                    <input type="email" id="cfg-contabilidad-email" placeholder="Correo de contabilidad" class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm">
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-zinc-100">
+                                <button type="button" onclick="resetDemoData()" class="text-xs text-rose-600 hover:underline font-semibold">
+                                    Restaurar configuración inicial
+                                </button>
+                                <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-extrabold bg-yellow-400 text-zinc-950 hover:bg-yellow-500 shadow-sm">
+                                    <i data-lucide="save" class="w-4 h-4"></i> Guardar Destinatarios
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Plantas Externas -->
+                    <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 sm:p-6 flex flex-col justify-between space-y-5">
+                        <div>
+                            <h2 class="font-extrabold text-zinc-950 text-base mb-1">Plantas Externas Registradas</h2>
+                            <p class="text-xs text-zinc-500 mb-4">Talleres aliados de Crearte By Confeccionarte SAS.</p>
+                            <div id="config-plantas-list" class="space-y-2.5 max-h-60 overflow-y-auto pr-1"></div>
+                        </div>
+
+                        <form onsubmit="addNewPlanta(event)" class="pt-4 border-t border-zinc-100 space-y-2.5">
+                            <h4 class="text-xs font-extrabold uppercase text-zinc-700">Agregar Planta Externa</h4>
+                            <input type="text" id="new-plt-nombre" required placeholder="Nombre del taller" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-xs">
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="text" id="new-plt-ciudad" required placeholder="Ciudad / Sector" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-xs">
+                                <input type="text" id="new-plt-contacto" required placeholder="Responsable" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-xs">
+                            </div>
+                            <input type="email" id="new-plt-email" required placeholder="Correo electrónico" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-xs">
+                            <button type="submit" class="w-full py-2.5 rounded-xl text-xs font-extrabold bg-zinc-950 text-yellow-400 hover:bg-zinc-800">
+                                + Registrar Planta Externa
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- VISTA 2: PORTAL PLANTA DE CONFECCIÓN EXTERNA                      -->
+        <!-- ================================================================= -->
+        <div id="role-view-planta" class="role-view hidden space-y-5">
+            
+            <!-- Selector de Planta Activa -->
+            <div class="bg-zinc-950 text-white rounded-2xl border border-zinc-800 p-4 sm:p-5 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-l-4 border-l-yellow-400">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-yellow-400 text-zinc-950 rounded-xl flex-shrink-0">
+                        <i data-lucide="factory" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <span class="text-[11px] font-extrabold uppercase tracking-wider text-yellow-400">Portal Planta Externa</span>
+                        <h1 class="text-base sm:text-lg font-extrabold text-white">Fichas Técnicas, Avance y Solicitud de Materiales</h1>
+                        <p id="active-planta-ciudad" class="text-xs text-zinc-400 mt-0.5"></p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2 bg-zinc-900 p-2.5 rounded-xl border border-zinc-700">
+                    <label for="active-planta-selector" class="text-xs font-bold text-yellow-400 px-1">Planta Activa:</label>
+                    <select id="active-planta-selector" onchange="onActivePlantaChange()" class="rounded-xl border border-zinc-600 bg-zinc-950 px-3.5 py-2 text-sm font-bold text-white focus:ring-2 focus:ring-yellow-400 outline-none"></select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                
+                <!-- Mis Fichas Asignadas + Reportar Avance -->
+                <section class="lg:col-span-5 bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 sm:p-5 space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+                        <div class="flex items-center gap-2.5">
+                            <div class="p-2 bg-zinc-950 text-yellow-400 rounded-xl">
+                                <i data-lucide="folder-open" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h2 class="font-extrabold text-zinc-950 text-sm">Mis Fichas Asignadas</h2>
+                                <p class="text-[11px] text-zinc-500">Reporta unidades terminadas o solicita faltantes</p>
+                            </div>
+                        </div>
+                        <span id="plt-fichas-count" class="px-2.5 py-1 rounded-lg bg-yellow-400 text-zinc-950 text-xs font-black">0</span>
+                    </div>
+                    <div id="plt-fichas-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                </section>
+
+                <!-- Solicitud de materiales a bodega -->
+                <section id="plt-solicitud-card" class="lg:col-span-7 bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 sm:p-5 space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+                        <div class="flex items-center gap-2.5">
+                            <div class="p-2 bg-yellow-400 text-zinc-950 rounded-xl">
+                                <i data-lucide="package-plus" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h2 class="font-extrabold text-zinc-950 text-sm">Solicitar Materiales a Bodega</h2>
+                                <p class="text-[11px] text-zinc-500">Se generan tickets separados para Telas e Insumos automáticamente</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form id="form-solicitud-planta" onsubmit="handlePreviewSolicitudPlanta(event)" class="space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1.5">Referencia de la Ficha *</label>
+                                <input type="text" id="sol-ref" list="refs-planta-datalist" required placeholder="Ej: REF-2026-501" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                                <datalist id="refs-planta-datalist"></datalist>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1.5">Lote / Orden de Producción *</label>
+                                <input type="text" id="sol-lote" required placeholder="Ej: OP-2026-088" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1.5">Motivo *</label>
+                                <select id="sol-motivo-tipo" required class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                                    <option value="Reposición">Reposición de materiales</option>
+                                    <option value="FALTANTE DESDE ORIGEN">FALTANTE DESDE ORIGEN</option>
+                                    <option value="Ampliación de lote">Ampliación de lote</option>
+                                    <option value="Cambio de especificación">Cambio de especificación</option>
+                                    <option value="DESPERDICIO">DESPERDICIO</option>
+                                    <option value="DAÑO DE CONFECCION">DAÑO DE CONFECCION</option>
+                                    <option value="PERDIDA DEL INSUMO">PERDIDA DEL INSUMO</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 mb-1.5">Urgencia *</label>
+                                <select id="sol-urgencia" required class="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                                    <option value="Normal">Normal</option>
+                                    <option value="Alta">Alta</option>
+                                    <option value="Crítica">Crítica</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                <h3 class="text-xs font-extrabold uppercase text-zinc-700">Materiales Solicitados</h3>
+                                <button type="button" onclick="addMaterialRow('sol-items-body')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-950 text-yellow-400 hover:bg-zinc-800">
+                                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Añadir Material
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto border border-zinc-200 rounded-xl">
+                                <table class="w-full min-w-[560px] text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-zinc-900 text-[11px] font-bold uppercase text-yellow-400">
+                                            <th class="py-2 px-2 w-28">Tipo</th>
+                                            <th class="py-2 px-2">Material *</th>
+                                            <th class="py-2 px-2 w-28">Color / Lote</th>
+                                            <th class="py-2 px-2 w-24">Cantidad *</th>
+                                            <th class="py-2 px-2 w-28">Unidad</th>
+                                            <th class="py-2 px-2 w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sol-items-body" class="divide-y divide-zinc-100 text-xs"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div id="live-routing-summary" class="p-3 rounded-xl bg-yellow-50 border border-yellow-300 text-[11px] space-y-1"></div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 mb-1.5">Observaciones</label>
+                            <textarea id="sol-notas" rows="2" placeholder="Ej: Requiere entrega antes del jueves..." class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none"></textarea>
+                        </div>
+
+                        <div class="flex justify-end pt-3 border-t border-zinc-100">
+                            <button type="submit" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-extrabold bg-yellow-400 text-zinc-950 hover:bg-yellow-500 shadow-sm">
+                                <i data-lucide="send" class="w-4 h-4"></i> Previsualizar y Enviar Solicitud
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            </div>
+
+            <!-- Historial de solicitudes de la planta activa -->
+            <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+                <div class="p-4 sm:p-5 border-b border-zinc-100">
+                    <h3 class="font-extrabold text-zinc-950">Mis Solicitudes de Material</h3>
+                    <p class="text-xs text-zinc-500">Estado de cada ticket y remisión de despacho correspondiente</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[760px] text-left border-collapse">
+                        <thead>
+                            <tr class="bg-zinc-900 text-[11px] font-bold uppercase text-yellow-400">
+                                <th class="py-3 px-4">Ticket / Fecha</th>
+                                <th class="py-3 px-4">Bodega</th>
+                                <th class="py-3 px-4">Referencia / Motivo</th>
+                                <th class="py-3 px-4">Materiales</th>
+                                <th class="py-3 px-4">Estado</th>
+                                <th class="py-3 px-4 text-right">Remisión</th>
+                            </tr>
+                        </thead>
+                        <tbody id="plt-pedidos-tbody" class="divide-y divide-zinc-100 text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: PREVISUALIZACIÓN DE CORREO                                     -->
+    <!-- ===================================================================== -->
+    <div id="email-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-zinc-950/70 p-3">
+        <div class="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border-t-4 border-yellow-400">
+            <div class="flex items-center justify-between p-4 sm:p-5 border-b border-zinc-100 no-print">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 bg-yellow-400 text-zinc-950 rounded-lg"><i data-lucide="mail" class="w-4 h-4"></i></div>
+                    <div>
+                        <h3 class="font-extrabold text-zinc-950 text-sm">Previsualización del Correo</h3>
+                        <p class="text-[11px] text-zinc-500">Revisa el contenido antes de enviarlo</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeModal('email-modal')" class="p-2 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="p-4 sm:p-5 space-y-3 text-xs">
+                <div id="email-split-alert" class="hidden p-3 rounded-xl bg-yellow-50 border border-yellow-300 text-zinc-900 font-bold">
+                   Pedido mixto: se enviará una solicitud a Bodega de Telas y otra a Almacén de Insumos.
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><span class="block font-extrabold text-zinc-500 uppercase text-[10px]">Para</span><span id="prev-to" class="break-all font-semibold text-zinc-900"></span></div>
+                    <div><span class="block font-extrabold text-zinc-500 uppercase text-[10px]">CC</span><span id="prev-cc" class="break-all font-semibold text-zinc-900"></span></div>
+                </div>
+                <div><span class="block font-extrabold text-zinc-500 uppercase text-[10px]">Asunto</span><span id="prev-subject" class="font-bold text-zinc-950"></span></div>
+                <div id="prev-attachment-row" class="hidden flex items-center gap-1.5 text-yellow-700 font-bold"><span id="prev-attachment" class="inline-flex items-center gap-1"></span></div>
+                <pre id="prev-body" class="whitespace-pre-wrap break-words font-sans text-[11px] leading-relaxed bg-zinc-50 border border-zinc-200 rounded-xl p-3 max-h-64 overflow-y-auto"></pre>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2 p-4 sm:p-5 border-t border-zinc-100 no-print">
+                <button type="button" onclick="copyEmailContent()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-zinc-100 text-zinc-800 hover:bg-zinc-200"><i data-lucide="copy" class="w-3.5 h-3.5"></i> Copiar texto</button>
+                <button type="button" onclick="commitPendingAction(true)" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-zinc-950 text-yellow-400 hover:bg-zinc-800"><i data-lucide="check" class="w-3.5 h-3.5"></i> Registrar y cerrar</button>
+                <button type="button" onclick="openMailClient()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold bg-yellow-400 text-zinc-950 hover:bg-yellow-500 shadow-sm"><i data-lucide="external-link" class="w-3.5 h-3.5"></i> Abrir correo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: REPORTAR AVANCE DE PRODUCCIÓN (POR TALLA)                      -->
+    <!-- ===================================================================== -->
+    <div id="avance-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-zinc-950/70 p-3">
+        <div class="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border-t-4 border-yellow-400">
+            <div class="flex items-center justify-between p-4 border-b border-zinc-100">
+                <div>
+                    <h3 class="font-extrabold text-zinc-950 text-sm">Reportar Avance de Producción</h3>
+                    <p class="text-[11px] text-zinc-500">Registra unidades terminadas por talla. El total y el porcentaje se calculan automáticamente.</p>
+                </div>
+                <button type="button" onclick="closeModal('avance-modal')" class="p-2 rounded-lg text-zinc-400 hover:text-rose-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <form onsubmit="guardarAvanceProduccion(event)" class="p-4 sm:p-5 space-y-4">
+                <input type="hidden" id="av-ficha-id">
+                <div id="av-ficha-info" class="p-3 rounded-xl bg-zinc-50 border border-zinc-200 text-xs"></div>
+
+                <datalist id="av-tallas-list">
+                    <option value="Única"></option>
+                    <option value="XS"></option>
+                    <option value="S"></option>
+                    <option value="M"></option>
+                    <option value="L"></option>
+                    <option value="XL"></option>
+                    <option value="2XL"></option>
+                    <option value="3XL"></option>
+                    <option value="28"></option>
+                    <option value="30"></option>
+                    <option value="32"></option>
+                    <option value="34"></option>
+                    <option value="36"></option>
+                    <option value="38"></option>
+                    <option value="40"></option>
+                    <option value="42"></option>
+                </datalist>
+
+                <div>
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <label class="text-xs font-extrabold uppercase text-zinc-700">Unidades terminadas por talla *</label>
+                        <button type="button" onclick="addAvanceTallaRow()" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-950 text-yellow-400 hover:bg-zinc-800">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Agregar talla
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto border border-zinc-200 rounded-xl">
+                        <table class="w-full min-w-[430px] text-left border-collapse text-xs">
+                            <thead class="bg-zinc-900 text-yellow-400">
+                                <tr>
+                                    <th class="py-2 px-3">Talla *</th>
+                                    <th class="py-2 px-3 w-40">Unidades terminadas *</th>
+                                    <th class="py-2 px-3 w-12 text-center"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="av-tallas-body" oninput="onAvanceTallaInput(event)" class="divide-y divide-zinc-100"></tbody>
+                        </table>
+                    </div>
+                    <p class="text-[11px] text-zinc-500 mt-1">Escribe la talla aunque no aparezca en la lista (por ejemplo: 31, 44, Manga larga).</p>
+                </div>
+
+                <div id="av-resumen" class="p-3 rounded-xl bg-yellow-50 border border-yellow-300 text-xs"></div>
+                <div id="av-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700"></div>
+
+                <div>
+                    <label class="block text-xs font-bold text-zinc-700 mb-1.5">Nota de avance</label>
+                    <textarea id="av-nota" rows="2" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-zinc-100">
+                    <button type="button" onclick="closeModal('avance-modal')" class="px-4 py-2 rounded-xl text-xs font-bold bg-zinc-100 text-zinc-700">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-yellow-400 text-zinc-950 hover:bg-yellow-500">Guardar Avance</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: DESGLOSE DE AVANCE POR TALLA                                    -->
+    <!-- ===================================================================== -->
+    <div id="avance-detalle-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-zinc-950/70 p-3">
+        <div class="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border-t-4 border-yellow-400">
+            <div class="flex items-center justify-between p-4 border-b border-zinc-100">
+                <div>
+                    <h3 id="av-detalle-title" class="font-extrabold text-zinc-950 text-sm">Desglose de avance por talla</h3>
+                    <p id="av-detalle-subtitle" class="text-[11px] text-zinc-500"></p>
+                </div>
+                <button type="button" onclick="closeModal('avance-detalle-modal')" class="p-2 rounded-lg text-zinc-400 hover:text-rose-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="p-4 sm:p-5 space-y-4">
+                <div id="av-detalle-resumen" class="grid grid-cols-3 gap-2 text-center"></div>
+                <div class="overflow-x-auto border border-zinc-200 rounded-xl">
+                    <table class="w-full min-w-[420px] text-left border-collapse text-xs">
+                        <thead class="bg-zinc-900 text-yellow-400">
+                            <tr>
+                                <th class="py-2 px-3">Talla</th>
+                                <th class="py-2 px-3 text-right">Unidades</th>
+                                <th class="py-2 px-3 text-right">% del total</th>
+                                <th class="py-2 px-3">Último reporte</th>
+                            </tr>
+                        </thead>
+                        <tbody id="av-detalle-body" class="divide-y divide-zinc-100"></tbody>
+                    </table>
+                </div>
+                <div id="av-detalle-nota" class="hidden p-3 rounded-xl bg-yellow-50 border border-yellow-300 text-xs"></div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-zinc-100">
+                    <button type="button" onclick="closeModal('avance-detalle-modal')" class="px-4 py-2 rounded-xl text-xs font-bold bg-zinc-100 text-zinc-700">Cerrar</button>
+                    <button type="button" id="av-detalle-edit-btn" onclick="editarAvanceDesdeDetalle()" class="hidden px-4 py-2 rounded-xl text-xs font-extrabold bg-yellow-400 text-zinc-950 hover:bg-yellow-500">Editar avance</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: DESPACHO DE MATERIALES                                         -->
+    <!-- ===================================================================== -->
+    <div id="dispatch-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-zinc-950/70 p-3">
+        <div class="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border-t-4 border-yellow-400">
+            <div class="flex items-center justify-between p-4 sm:p-5 border-b border-zinc-100">
+                <h3 id="disp-modal-title" class="font-extrabold text-zinc-950 text-sm">Despachar solicitud</h3>
+                <button type="button" onclick="closeModal('dispatch-modal')" class="p-2 rounded-lg text-zinc-400 hover:text-rose-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <form onsubmit="confirmDispatch(event)" class="p-4 sm:p-5 space-y-4">
+                <input type="hidden" id="disp-sol-id">
+                <div id="disp-info-box" class="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl bg-zinc-50 border border-zinc-200 text-xs"></div>
+                <div id="disp-cobro-box" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-300 space-y-2">
+                    <div class="text-xs font-extrabold text-rose-800">Solicitud posterior al plazo de dos días hábiles</div>
+                    <p class="text-[11px] text-zinc-700">Si autorizas el despacho, se enviará automáticamente un correo a Contabilidad para realizar el cobro.</p>
+                    <label class="flex items-start gap-2 text-xs font-bold text-zinc-900">
+                        <input type="checkbox" id="disp-autoriza-cobro" class="mt-0.5 w-4 h-4 accent-yellow-500">
+                        <span>Autorizar cobro a Contabilidad por este material</span>
+                    </label>
+                </div>
+                <div class="overflow-x-auto border border-zinc-200 rounded-xl">
+                    <table class="w-full min-w-[500px] text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-zinc-900 text-[11px] font-bold uppercase text-yellow-400">
+                                <th class="py-2 px-3">M aterial</th>
+                                <th class="py-2 px-3">Color</th>
+                                <th class="py-2 px-3">Solicitado</th>
+                                <th class="py-2 px-3 text-right">A despachar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="disp-items-tbody" class="divide-y divide-zinc-100"></tbody>
+                    </table>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-700 mb-1.5">N° Remisión / Guía *</label>
+                        <input type="text" id="disp-remision" required class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-yellow-400 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-700 mb-1.5">Transporte / Mensajero</label>
+                        <input type="text" id="disp-transporte" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-zinc-700 mb-1.5">Observaciones de entrega</label>
+                    <textarea id="disp-notas" rows="2" class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-zinc-100">
+                    <button type="button" onclick="closeModal('dispatch-modal')" class="px-4 py-2 rounded-xl text-xs font-bold bg-zinc-100 text-zinc-700">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-yellow-400 text-zinc-950 hover:bg-yellow-500 shadow-sm">Confirmar Despacho</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: REMISIÓN IMPRIMIBLE                                            -->
+    <!-- ===================================================================== -->
+    <div id="detail-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-zinc-950/70 p-3">
+        <div class="w-full max-w-3xl max-h-[94vh] overflow-y-auto bg-white rounded-2xl shadow-2xl">
+            <div class="flex items-center justify-between p-4 border-b border-zinc-100 no-print">
+                <h3 id="det-title" class="font-extrabold text-zinc-950 text-sm">Remisión</h3>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="window.print()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-zinc-950 text-yellow-400 hover:bg-zinc-800"><i data-lucide="printer" class="w-3.5 h-3.5"></i> Imprimir / PDF</button>
+                    <button type="button" onclick="closeModal('detail-modal')" class="p-2 rounded-lg text-zinc-400 hover:text-rose-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+            </div>
+            <div id="det-content" class="p-5 sm:p-7 text-xs"></div>
+        </div>
+    </div>
+
+    <!-- Notificaciones -->
+    <div id="toast" class="fixed bottom-4 right-4 z-[60] max-w-[90vw] translate-y-24 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="flex items-center gap-2 bg-zinc-950 text-white border-l-4 border-yellow-400 px-4 py-3 rounded-xl shadow-xl text-xs font-bold">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-yellow-400 flex-shrink-0"></i>
+            <span id="toast-msg"></span>
+        </div>
+    </div>
+
+    <!-- librerías y lógica de la aplicación -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
