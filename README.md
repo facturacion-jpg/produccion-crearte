@@ -83,16 +83,20 @@ git push -u origin main
 3. En `js/config.js`, confirmar que `FIREBASE_CONFIG` corresponde a ese proyecto.
 4. Activar **Authentication → Sign-in method → Anonymous**.
    Solo se usa como respaldo mientras la cuenta de servicio no esté configurada; la app y la firma pública autentican con custom tokens.
-5. Crear una cuenta de servicio:
-   - Firebase Console → **Project settings** → **Service accounts**.
-   - **Generate new private key** y descargar el JSON.
-   - En Apps Script → **Configuración del proyecto → Propiedades de script**, agregar:
-     - `FIREBASE_SERVICE_CLIENT_EMAIL`: el valor `client_email` del JSON.
-     - `FIREBASE_SERVICE_PRIVATE_KEY`: el valor `private_key` del JSON (con `-----BEGIN PRIVATE KEY-----` y `-----END PRIVATE KEY-----`).
-   - La llave queda solo en Apps Script. No se sube a GitHub ni se envía al navegador.
-6. Volver a publicar el Web App de `AuthWebApp.gs` (**Deploy → New version**) y ejecutar una vez `inicializarAuth()` para crear la hoja `FirmasPublicas`.
-7. Confirmar que el login funcione y que `firmar.html` abra un enlace existente.
-8. Solo entonces publicar las reglas de `firebase.rules.json` en **Realtime Database → Rules**.
+5. Configurar la cuenta de servicio. **Método recomendado: IAM `signBlob`, sin llave privada.**
+   - Firebase Console → **Project settings** → **Service accounts**. Copia el correo `firebase-adminsdk@...`.
+   - En Apps Script → **Configuración del proyecto → Propiedades de script**, agrega:
+     - `FIREBASE_SERVICE_CLIENT_EMAIL`: ese correo.
+   - En el proyecto de Google Cloud del Apps Script:
+     - Habilita **IAM Credentials API**.
+     - En **IAM y administración → Cuentas de servicio**, selecciona `firebase-adminsdk@...` → **Permisos** → **Conceder acceso**.
+     - Principal: el correo del dueño del Apps Script. Rol: **Service Account Token Creator** (`iam.serviceAccounts.signBlob`).
+   - En `appsscript.json` (Configuración del proyecto → **Mostrar archivos de manifiesto**) agrega el scope `https://www.googleapis.com/auth/iam` conservando los demás scopes del archivo `google-apps-script/appsscript.json` de este repo.
+   - Ejecuta una vez `probarTokenFirebase()` desde el editor. En *Registros* debe decir **Custom token de Firebase generado correctamente**.
+6. Método alternativo solo si tu organización permite descargar llaves: generar la llave privada y agregar `FIREBASE_SERVICE_PRIVATE_KEY`. El código usa esa llave si existe; si no, usa `signBlob`. La llave nunca se sube a GitHub ni viaja al navegador.
+7. Volver a publicar el Web App de `AuthWebApp.gs` (**Deploy → New version**) y ejecutar una vez `inicializarAuth()` para crear la hoja `FirmasPublicas`.
+8. Confirmar que el login funcione y que `firmar.html` abra un enlace existente.
+9. Solo entonces publicar las reglas de `firebase.rules.json` en **Realtime Database → Rules**.
 
 Las reglas nuevas exigen custom token:
 
@@ -126,11 +130,11 @@ El proyecto `Auth Produccion Crearte` (`google-apps-script/AuthWebApp.gs`) adem�
 USUARIOS_SPREADSHEET_ID       = ID de "Usuarios Produccion Crearte"
 USER_SETUP_KEY                = clave de alta del primer usuario
 AUTH_SECRET                   = se genera solo
-FIREBASE_SERVICE_CLIENT_EMAIL = client_email de la cuenta de servicio
-FIREBASE_SERVICE_PRIVATE_KEY  = private_key de la cuenta de servicio
+FIREBASE_SERVICE_CLIENT_EMAIL = correo firebase-adminsdk@... de la cuenta de servicio
+FIREBASE_SERVICE_PRIVATE_KEY  = OPCIONAL; solo si se permite descargar llaves
 ```
 
-Después de pegar el código actualizado, crea una nueva versión del Web App y ejecuta `inicializarAuth()` una vez desde el editor. Eso crea la pestaña `FirmasPublicas` en la misma hoja de usuarios.
+Después de pegar el código actualizado y el `appsscript.json`, autoriza el nuevo scope ejecutando `probarTokenFirebase()` desde el editor. Luego crea una nueva versión del Web App y ejecuta `inicializarAuth()` una vez. Eso crea la pestaña `FirmasPublicas` en la misma hoja de usuarios.
 
 El formulario de ficha de salida admite **dos archivos**: Ficha Técnica y Salida de Insumos. Ambos se envían en `adjuntosPdf` (arreglo). `adjuntoPdf` se mantiene solo para compatibilidad con versiones anteriores.
 
@@ -218,7 +222,7 @@ El acceso usa una hoja de Google Sheets del Workspace, sin Firebase Authenticati
 2. Crea un proyecto de Apps Script nuevo y pega todo `google-apps-script/AuthWebApp.gs`.
 3. En **Configuración del proyecto → Propiedades de script**, agrega:
    - `USUARIOS_SPREADSHEET_ID`: el ID del spreadsheet del paso 1.
-   - `FIREBASE_SERVICE_CLIENT_EMAIL` y `FIREBASE_SERVICE_PRIVATE_KEY`: los datos de la cuenta de servicio indicados en la sección de Firebase.
+   - `FIREBASE_SERVICE_CLIENT_EMAIL`: el correo de la cuenta de servicio indicado en la sección de Firebase (`FIREBASE_SERVICE_PRIVATE_KEY` solo si se permite descargar llaves).
 4. En el editor de Apps Script ejecuta una sola vez `inicializarAuth()` y autoriza. En *Registros/Logs* verás la URL de la hoja y la `USER_SETUP_KEY`.
 5. Publica el script como **Web app**:
    - *Execute as:* el dueño del script.
@@ -292,7 +296,7 @@ Columnas de la hoja: `usuario | nombre | correo | rol | planta_id | activo | sal
 - [ ] Despachar una solicitud y confirmar que la planta recibe el correo con el enlace **Firmar recibido** y el botón del Apps Script.
 - [ ] Abrir ese enlace, marcar Recibido y Estado en cada material, firmar y verificar que el estado cambia a **Recibido firmado** en los listados y en la remisión.
 - [ ] Publicar `AuthWebApp.gs`, configurar `USUARIOS_SPREADSHEET_ID` y pegar la URL `/exec` en `APP_SYSTEM.apiAuthUrl`.
-- [ ] Configurar `FIREBASE_SERVICE_CLIENT_EMAIL` y `FIREBASE_SERVICE_PRIVATE_KEY`, ejecutar `inicializarAuth()` y publicar una nueva versión del Web App.
+- [ ] Configurar `FIREBASE_SERVICE_CLIENT_EMAIL`, el scope `iam` y el rol **Service Account Token Creator**; ejecutar `probarTokenFirebase()` y `inicializarAuth()`, y publicar una nueva versión del Web App.
 - [ ] Entrar con un usuario y confirmar que Firebase recibe el custom token (sin errores `permission_denied`).
 - [ ] Abrir un enlace de firma antiguo y uno nuevo; ambos deben cargar con `firmar.html` público.
 - [ ] Publicar `firebase.rules.json` en Realtime Database y repetir la prueba de login y firma.

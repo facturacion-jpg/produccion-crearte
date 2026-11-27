@@ -11,7 +11,9 @@
 //   USER_SETUP_KEY          = clave única para dar de alta al PRIMER usuario.
 //   AUTH_SECRET             = se genera sola; no la cambies sin cerrar sesiones.
 //   FIREBASE_SERVICE_CLIENT_EMAIL = correo de la cuenta de servicio de Firebase.
-//   FIREBASE_SERVICE_PRIVATE_KEY  = llave privada JSON de esa cuenta de servicio.
+//   FIREBASE_SERVICE_PRIVATE_KEY  = OPCIONAL. Solo si tu organización permite
+//                                   descargar llaves. Si no está, se usa IAM
+//                                   signBlob (recomendado, sin llave privada).
 //
 // La hoja de usuarios se llama "Usuarios" y se crea sola con estas columnas:
 //   usuario | nombre | correo | rol | planta_id | activo | salt | clave_hash | creado_at | creado_por
@@ -246,18 +248,57 @@ function verificarToken(token) {
 }
 
 // -----------------------------------------------------------------------------
-// Custom tokens de Firebase (RS256 firmado por la cuenta de servicio).
-// La llave privada vive solo en Propiedades del script; nunca viaja al navegador.
+// Custom tokens de Firebase.
+// Forma recomendada: IAM Credentials API (signBlob), sin llave privada descargada.
+// Forma alternativa: llave privada en Propiedades del script, si la política de
+// la organización permite crearla. Ninguna credencial viaja al navegador.
 // -----------------------------------------------------------------------------
 function base64Url(valor) {
     return Utilities.base64EncodeWebSafe(String(valor), Utilities.Charset.UTF_8)
         .replace(/=+$/, "");
 }
 
+function firmarConServicio(sinFirmar, correo) {
+    const llave = propiedad("FIREBASE_SERVICE_PRIVATE_KEY").replace(/\\n/g, "\n").trim();
+    if (llave) {
+        try {
+            return Utilities.computeRsaSha256Signature(sinFirmar, llave);
+        } catch (err) {
+            Logger.log("No se pudo firmar con la llave local: " + err);
+        }
+    }
+
+    try {
+        const url = "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/" +
+            encodeURIComponent(correo) + ":signBlob";
+        const respuesta = UrlFetchApp.fetch(url, {
+            method: "post",
+            contentType: "application/json",
+            headers: {
+                Authorization: "Bearer " + ScriptApp.getOAuthToken()
+            },
+            payload: JSON.stringify({
+                payload: Utilities.base64Encode(sinFirmar, Utilities.Charset.UTF_8)
+            }),
+            muteHttpExceptions: true
+        });
+        const codigo = respuesta.getResponseCode();
+        const cuerpo = respuesta.getContentText();
+        if (codigo < 200 || codigo >= 300) {
+            Logger.log("IAM signBlob respondió " + codigo + ": " + cuerpo);
+            return null;
+        }
+        const datos = JSON.parse(cuerpo);
+        return Utilities.base64Decode(String(datos.signedBlob || ""));
+    } catch (err) {
+        Logger.log("No se pudo firmar con IAM signBlob: " + err);
+        return null;
+    }
+}
+
 function firebaseCustomToken(uid, claims) {
     const correo = propiedad("FIREBASE_SERVICE_CLIENT_EMAIL").trim();
-    const llave = propiedad("FIREBASE_SERVICE_PRIVATE_KEY").replace(/\\n/g, "\n").trim();
-    if (!correo || !llave) return "";
+    if (!correo) return "";
 
     const ahora = Math.floor(Date.now() / 1000);
     const payload = {
@@ -271,8 +312,17 @@ function firebaseCustomToken(uid, claims) {
     };
     const sinFirmar = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" })) +
         "." + base64Url(JSON.stringify(payload));
-    const firma = Utilities.computeRsaSha256Signature(sinFirmar, llave);
+    const firma = firmarConServicio(sinFirmar, correo);
+    if (!firma) return "";
     return sinFirmar + "." + Utilities.base64EncodeWebSafe(firma).replace(/=+$/, "");
+}
+
+function probarTokenFirebase() {
+    const token = firebaseCustomToken("prueba_crearte", { rol: "LECTURA", prueba: true });
+    Logger.log(token
+        ? "Custom token de Firebase generado correctamente (" + token.length + " caracteres)."
+        : "No se pudo generar el custom token. Revisa los Registros.");
+    return token ? "OK" : "ERROR";
 }
 
 function tokenFirebaseUsuario(u) {
@@ -547,7 +597,10 @@ function inicializarAuth() {
     const url = hoja.getParent().getUrl();
     Logger.log("Hoja: " + url);
     Logger.log("USER_SETUP_KEY: " + propiedad("USER_SETUP_KEY"));
-    Logger.log("Firebase service account configurado: " +
-        (propiedad("FIREBASE_SERVICE_CLIENT_EMAIL") && propiedad("FIREBASE_SERVICE_PRIVATE_KEY") ? "SÍ" : "NO"));
+    const correoFirebase = propiedad("FIREBASE_SERVICE_CLIENT_EMAIL").trim();
+    const modoFirma = propiedad("FIREBASE_SERVICE_PRIVATE_KEY").trim()
+        ? "llave privada local" : "IAM signBlob (sin llave)";
+    Logger.log("Firebase service account configurado: " + (correoFirebase ? "SÍ" : "NO"));
+    Logger.log("Modo de firma: " + (correoFirebase ? modoFirma : "sin configurar"));
     return url;
 }
