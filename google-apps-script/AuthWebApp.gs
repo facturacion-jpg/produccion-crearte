@@ -10,8 +10,10 @@
 //   USUARIOS_SPREADSHEET_ID = ID de la hoja de Google Sheets de usuarios.
 //   USER_SETUP_KEY          = clave única para dar de alta al PRIMER usuario.
 //   AUTH_SECRET             = se genera sola; no la cambies sin cerrar sesiones.
+//   FIREBASE_SERVICE_CLIENT_EMAIL = correo de la cuenta de servicio de Firebase.
+//   FIREBASE_SERVICE_PRIVATE_KEY  = llave privada JSON de esa cuenta de servicio.
 //
-// La hoja se llama "Usuarios" y se crea sola con estas columnas:
+// La hoja de usuarios se llama "Usuarios" y se crea sola con estas columnas:
 //   usuario | nombre | correo | rol | planta_id | activo | salt | clave_hash | creado_at | creado_por
 //
 // Roles válidos: ADMIN, FICHAS, TELAS, INSUMOS, PLANTA, LECTURA.
@@ -19,9 +21,13 @@
 // =============================================================================
 
 const AUTH_SHEET_NAME = "Usuarios";
+const FIRMAS_SHEET_NAME = "FirmasPublicas";
 const AUTH_ENCABEZADOS = [
     "usuario", "nombre", "correo", "rol", "planta_id", "activo",
     "salt", "clave_hash", "creado_at", "creado_por"
+];
+const FIRMAS_ENCABEZADOS = [
+    "id", "token", "tipo", "planta_id", "registro_json", "creado_at"
 ];
 const AUTH_ROLES = ["ADMIN", "FICHAS", "TELAS", "INSUMOS", "PLANTA", "LECTURA"];
 
@@ -110,6 +116,8 @@ function manejarAuth(data) {
     if (accion === "crear") return authCrear(datos);
     if (accion === "listar") return authListar(datos);
     if (accion === "cambiarClave") return authCambiarClave(datos);
+    if (accion === "registrarFirma") return authRegistrarFirma(datos);
+    if (accion === "tokenFirmaPublica") return authTokenFirmaPublica(datos);
     return { ok: false, mensaje: "Acción no reconocida." };
 }
 
@@ -237,19 +245,67 @@ function verificarToken(token) {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Custom tokens de Firebase (RS256 firmado por la cuenta de servicio).
+// La llave privada vive solo en Propiedades del script; nunca viaja al navegador.
+// -----------------------------------------------------------------------------
+function base64Url(valor) {
+    return Utilities.base64EncodeWebSafe(String(valor), Utilities.Charset.UTF_8)
+        .replace(/=+$/, "");
+}
+
+function firebaseCustomToken(uid, claims) {
+    const correo = propiedad("FIREBASE_SERVICE_CLIENT_EMAIL").trim();
+    const llave = propiedad("FIREBASE_SERVICE_PRIVATE_KEY").replace(/\\n/g, "\n").trim();
+    if (!correo || !llave) return "";
+
+    const ahora = Math.floor(Date.now() / 1000);
+    const payload = {
+        iss: correo,
+        sub: correo,
+        aud: "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
+        iat: ahora,
+        exp: ahora + 3600,
+        uid: String(uid || "").slice(0, 128),
+        claims: claims || {}
+    };
+    const sinFirmar = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" })) +
+        "." + base64Url(JSON.stringify(payload));
+    const firma = Utilities.computeRsaSha256Signature(sinFirmar, llave);
+    return sinFirmar + "." + Utilities.base64EncodeWebSafe(firma).replace(/=+$/, "");
+}
+
+function tokenFirebaseUsuario(u) {
+    const usuario = normalizarUsuario(u.usuario);
+    const uid = ("u_" + usuario.replace(/[^a-z0-9_-]/g, "_")).slice(0, 128);
+    return firebaseCustomToken(uid, {
+        rol: String(u.rol || ""),
+        planta_id: String(u.planta_id || ""),
+        usuario: usuario,
+        nombre: String(u.nombre || u.usuario || "")
+    });
+}
+
+function datosSesionConFirebase(sesion) {
+    const copia = Object.assign({}, sesion);
+    copia.firebaseToken = tokenFirebaseUsuario(sesion);
+    return copia;
+}
+
 function sesionDe(u) {
     const token = crearToken(u);
+    const sesion = {
+        usuario: normalizarUsuario(u.usuario),
+        nombre: String(u.nombre || u.usuario),
+        correo: String(u.correo || ""),
+        rol: String(u.rol),
+        plantaId: String(u.planta_id || ""),
+        exp: Date.now() + (12 * 60 * 60 * 1000)
+    };
     return {
         ok: true,
         token: token,
-        sesion: {
-            usuario: normalizarUsuario(u.usuario),
-            nombre: String(u.nombre || u.usuario),
-            correo: String(u.correo || ""),
-            rol: String(u.rol),
-            plantaId: String(u.planta_id || ""),
-            exp: Date.now() + (12 * 60 * 60 * 1000)
-        }
+        sesion: datosSesionConFirebase(sesion)
     };
 }
 
@@ -271,7 +327,7 @@ function authLogin(datos) {
 function authValidar(datos) {
     const sesion = verificarToken(datos.token);
     if (!sesion) return { ok: false, mensaje: "Sesión vencida o inválida." };
-    return { ok: true, sesion: sesion };
+    return { ok: true, sesion: datosSesionConFirebase(sesion) };
 }
 
 function esAdmin(datos) {
@@ -373,11 +429,115 @@ function authCambiarClave(datos) {
 }
 
 // -----------------------------------------------------------------------------
+// Registro de enlaces públicos de firma. Permite que firmar.html obtenga un
+// custom token de Firebase sin conocer usuario ni clave.
+// -----------------------------------------------------------------------------
+function obtenerHojaFirmas() {
+    const id = propiedad("USUARIOS_SPREADSHEET_ID");
+    if (!id) {
+        throw new Error("Configura USUARIOS_SPREADSHEET_ID en Propiedades del script.");
+    }
+    const archivo = SpreadsheetApp.openById(id);
+    let hoja = archivo.getSheetByName(FIRMAS_SHEET_NAME);
+    if (!hoja) hoja = archivo.insertSheet(FIRMAS_SHEET_NAME);
+
+    const ancho = hoja.getLastColumn();
+    const cabeceras = ancho ? hoja.getRange(1, 1, 1, ancho).getValues()[0] : [];
+    if (cabeceras.join("|") !== FIRMAS_ENCABEZADOS.join("|")) {
+        hoja.getRange(1, 1, 1, Math.max(ancho, FIRMAS_ENCABEZADOS.length)).clear();
+        hoja.getRange(1, 1, 1, FIRMAS_ENCABEZADOS.length).setValues([FIRMAS_ENCABEZADOS]);
+    }
+    return hoja;
+}
+
+function tipoFirma(valor) {
+    return String(valor) === "despacho" ? "despacho" : "ficha";
+}
+
+function authRegistrarFirma(datos) {
+    const sesion = verificarToken(datos.tokenSesion);
+    if (!sesion || sesion.rol === "LECTURA") {
+        return { ok: false, mensaje: "Solo un usuario autorizado puede registrar enlaces de firma." };
+    }
+    const id = String(datos.id || "").trim();
+    const token = String(datos.token || "").trim();
+    if (!/^[A-Za-z0-9_-]+$/.test(id) || !token) {
+        return { ok: false, mensaje: "Datos de firma no válidos." };
+    }
+    const tipo = tipoFirma(datos.tipo);
+    let registroJson = "";
+    try {
+        registroJson = JSON.stringify(datos.registro || {});
+    } catch (err) {
+        registroJson = "{}";
+    }
+    if (registroJson.length > 45000) registroJson = "{}";
+
+    const hoja = obtenerHojaFirmas();
+    const ultimaFila = hoja.getLastRow();
+    if (ultimaFila > 1) {
+        const filas = hoja.getRange(2, 1, ultimaFila - 1, FIRMAS_ENCABEZADOS.length).getValues();
+        for (let i = 0; i < filas.length; i++) {
+            if (String(filas[i][0]) === id && String(filas[i][2]) === tipo) {
+                hoja.getRange(i + 2, 1, 1, FIRMAS_ENCABEZADOS.length).setValues([[
+                    id, token, tipo, String(datos.plantaId || ""), registroJson, new Date().toISOString()
+                ]]);
+                return { ok: true, mensaje: "Enlace de firma actualizado." };
+            }
+        }
+    }
+    hoja.appendRow([
+        id, token, tipo, String(datos.plantaId || ""), registroJson, new Date().toISOString()
+    ]);
+    return { ok: true, mensaje: "Enlace de firma registrado." };
+}
+
+function buscarFirmaPublica(id, token, tipo) {
+    const hoja = obtenerHojaFirmas();
+    const ultimaFila = hoja.getLastRow();
+    if (ultimaFila < 2) return null;
+    const filas = hoja.getRange(2, 1, ultimaFila - 1, FIRMAS_ENCABEZADOS.length).getValues();
+    const fila = filas.find(f => String(f[0]) === id && String(f[1]) === token && String(f[2]) === tipo);
+    if (!fila) return null;
+    let registro = {};
+    try {
+        registro = JSON.parse(String(fila[4] || "{}"));
+    } catch (err) {
+        registro = {};
+    }
+    return registro;
+}
+
+function authTokenFirmaPublica(datos) {
+    const id = String(datos.id || "").trim();
+    const token = String(datos.token || "").trim();
+    const tipo = tipoFirma(datos.tipo);
+    if (!/^[A-Za-z0-9_-]+$/.test(id) || !token) {
+        return { ok: false, mensaje: "El enlace de firma no es válido." };
+    }
+    const registro = buscarFirmaPublica(id, token, tipo);
+    if (!registro || !registro.id) {
+        return { ok: false, mensaje: "El enlace de firma no está registrado o fue reemplazado." };
+    }
+    const uid = ("firma_" + id.replace(/[^A-Za-z0-9_-]/g, "_")).slice(0, 128);
+    const firebaseToken = firebaseCustomToken(uid, {
+        firma: true,
+        ficha_id: id,
+        tipo: tipo
+    });
+    if (!firebaseToken) {
+        return { ok: false, mensaje: "Falta configurar la cuenta de servicio de Firebase en el Apps Script." };
+    }
+    return { ok: true, firebaseToken: firebaseToken, registro: registro };
+}
+
+// -----------------------------------------------------------------------------
 // Utilidad para ejecutar una vez desde el editor de Apps Script:
 // crea la hoja "Usuarios" y deja lista la configuración.
 // -----------------------------------------------------------------------------
 function inicializarAuth() {
     const hoja = obtenerHojaUsuarios();
+    obtenerHojaFirmas();
     secretoAuth();
     if (!propiedad("USER_SETUP_KEY")) {
         PropertiesService.getScriptProperties().setProperty(
@@ -387,5 +547,7 @@ function inicializarAuth() {
     const url = hoja.getParent().getUrl();
     Logger.log("Hoja: " + url);
     Logger.log("USER_SETUP_KEY: " + propiedad("USER_SETUP_KEY"));
+    Logger.log("Firebase service account configurado: " +
+        (propiedad("FIREBASE_SERVICE_CLIENT_EMAIL") && propiedad("FIREBASE_SERVICE_PRIVATE_KEY") ? "SÍ" : "NO"));
     return url;
 }

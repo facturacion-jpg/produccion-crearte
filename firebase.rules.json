@@ -1,8 +1,31 @@
 {
   "rules": {
     "crearte_produccion": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firma !== true",
+      "produccion_config": {
+        ".write": "auth != null && auth.token.firma !== true && auth.token.rol === 'ADMIN'"
+      },
+      "produccion_plantas": {
+        ".write": "auth != null && auth.token.firma !== true && auth.token.rol === 'ADMIN'"
+      },
+      "produccion_fichas": {
+        ".write": "auth != null && auth.token.firma !== true && (auth.token.rol === 'ADMIN' || auth.token.rol === 'FICHAS')"
+      },
+      "produccion_solicitudes": {
+        ".write": "auth != null && auth.token.firma !== true && (auth.token.rol === 'ADMIN' || auth.token.rol === 'FICHAS' || auth.token.rol === 'TELAS' || auth.token.rol === 'INSUMOS' || auth.token.rol === 'PLANTA')"
+      },
+      "produccion_firmas": {
+        "$id": {
+          ".read": "auth != null && (auth.token.firma !== true || (auth.token.ficha_id === $id && auth.token.tipo === 'ficha'))",
+          ".write": "auth != null && !data.exists() && ((auth.token.firma === true && auth.token.ficha_id === $id && auth.token.tipo === 'ficha') || auth.token.rol === 'ADMIN')"
+        }
+      },
+      "produccion_firmas_despachos": {
+        "$id": {
+          ".read": "auth != null && (auth.token.firma !== true || (auth.token.ficha_id === $id && auth.token.tipo === 'despacho'))",
+          ".write": "auth != null && !data.exists() && ((auth.token.firma === true && auth.token.ficha_id === $id && auth.token.tipo === 'despacho') || auth.token.rol === 'ADMIN')"
+        }
+      }
     }
   }
 }

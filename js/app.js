@@ -39,6 +39,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         await Auth.iniciar();
     }
     inicializarApp();
+    sincronizarFirmasPublicasExistentes();
 });
 
 function inicializarApp() {
@@ -60,15 +61,45 @@ function inicializarApp() {
 
 window.addEventListener("load", renderIcons);
 
-function saveAllState() {
-    const sync = Promise.all([
-        DataStore.save(DataStore.KEYS.CONFIG, appConfig),
-        DataStore.save(DataStore.KEYS.PLANTAS, appPlantas),
-        DataStore.save(DataStore.KEYS.FICHAS, appFichas),
-        DataStore.save(DataStore.KEYS.SOLICITUDES, appSolicitudes)
-    ]);
+function saveAllState(keys) {
+    const valores = {};
+    valores[DataStore.KEYS.CONFIG] = appConfig;
+    valores[DataStore.KEYS.PLANTAS] = appPlantas;
+    valores[DataStore.KEYS.FICHAS] = appFichas;
+    valores[DataStore.KEYS.SOLICITUDES] = appSolicitudes;
+
+    const seleccion = Array.isArray(keys)
+        ? keys
+        : [DataStore.KEYS.CONFIG, DataStore.KEYS.PLANTAS, DataStore.KEYS.FICHAS, DataStore.KEYS.SOLICITUDES];
+    const sync = Promise.all(seleccion.map(key => DataStore.save(key, valores[key])));
     updatePendientesBadges();
     return sync;
+}
+
+// Registra id + token en el Apps Script para que firmar.html pueda obtener un
+// token de Firebase sin login. El registro viaja con una copia del documento
+// para que la página pública no tenga que leer las colecciones completas.
+function registrarFirmaPublica(registro, tipo) {
+    if (!registro || !registro.firmaToken || !window.Auth || typeof Auth.registrarFirmaPublica !== "function") {
+        return Promise.resolve(false);
+    }
+    return Auth.registrarFirmaPublica({
+        id: registro.id,
+        token: registro.firmaToken,
+        tipo: tipo,
+        plantaId: registro.plantaId || "",
+        registro: registro
+    }).then(respuesta => !!respuesta.ok).catch(() => false);
+}
+
+async function sincronizarFirmasPublicasExistentes() {
+    if (!conAuth() || Auth.sesion()?.rol !== "ADMIN") return;
+    const registros = []
+        .concat((appFichas || []).filter(f => f && f.firmaToken).map(f => ({ registro: f, tipo: "ficha" })))
+        .concat((appSolicitudes || []).filter(s => s && s.firmaToken).map(s => ({ registro: s, tipo: "despacho" })));
+    for (const item of registros) {
+        await registrarFirmaPublica(item.registro, item.tipo);
+    }
 }
 
 // La planta confirma "Recibido (Sí/No)" y "Estado" por ítem al firmar desde el
@@ -383,7 +414,7 @@ function addNewPlanta(e) {
         email: document.getElementById("new-plt-email").value.trim()
     };
     appPlantas.push(newPlanta);
-    saveAllState();
+    saveAllState([DataStore.KEYS.PLANTAS]);
     populatePlantasSelectors();
     renderConfigPlantasList();
     e.target.reset();
@@ -783,8 +814,9 @@ function handlePreviewFichaSalida(e) {
     const emailPayload = pendingEmailPayload;
 
     pendingCommitCallback = async () => {
+        await registrarFirmaPublica(newFicha, "ficha");
         appFichas.unshift(newFicha);
-        await saveAllState();
+        await saveAllState([DataStore.KEYS.FICHAS]);
         let correoOk = true;
         try {
             await DataStore.enviarCorreoConPdf(emailPayload);
@@ -1069,7 +1101,7 @@ function handlePreviewSolicitudPlanta(e) {
 
     pendingCommitCallback = async () => {
         ticketsToCreate.forEach(t => appSolicitudes.unshift(t));
-        saveAllState();
+        await saveAllState([DataStore.KEYS.SOLICITUDES]);
         let correoOk = true;
         try {
             await DataStore.enviarCorreoConPdf(emailPayload);
@@ -1457,7 +1489,7 @@ function guardarAvanceProduccion(e) {
     f.avancesPorTalla = Array.from(resumen.values());
     f.unidadesTerminadas = f.avancesPorTalla.reduce((suma, a) => suma + a.unidades, 0);
     f.notaAvance = document.getElementById("av-nota").value.trim();
-    saveAllState();
+    saveAllState([DataStore.KEYS.FICHAS]);
     renderPlantaView();
     renderCentralView();
     closeModal("avance-modal");
@@ -1675,7 +1707,8 @@ async function confirmDispatch(e) {
         cobroCorreoEnviado: false
     };
 
-    saveAllState();
+    await registrarFirmaPublica(sol, "despacho");
+    await saveAllState([DataStore.KEYS.SOLICITUDES]);
     renderCentralView();
     closeModal("dispatch-modal");
 
@@ -1723,7 +1756,7 @@ async function confirmDispatch(e) {
             sol.firmaEmailEnviado = firmaOk;
             sol.firmaEmailFecha = new Date().toISOString();
             sol.firmaEmailPara = firmaPayload.para;
-            saveAllState();
+            saveAllState([DataStore.KEYS.SOLICITUDES]);
             renderCentralView();
             DataStore.notificarPanelCentral("DESPACHO_MATERIAL_FIRMA", {
                 solicitudId: sol.id,
@@ -1772,7 +1805,7 @@ async function confirmDispatch(e) {
         sol.despachoInfo.cobroCorreoEnviado = enviado;
         sol.despachoInfo.cobroFecha = new Date().toISOString();
         sol.despachoInfo.cobroPara = cobroPayload.para;
-        saveAllState();
+        saveAllState([DataStore.KEYS.SOLICITUDES]);
         renderCentralView();
         DataStore.notificarPanelCentral("COBRO_CONTABILIDAD", {
             solicitudId: sol.id,
@@ -1959,7 +1992,8 @@ function generarEnlaceFirma(id) {
     if (!f.firmaToken) f.firmaToken = generarTokenFirma();
     f.firmaUrl = construirUrlFirma(f.id, f.firmaToken);
     if (!f.fechaLimiteNovedades) f.fechaLimiteNovedades = calcularFechaLimiteNovedades(f.fecha);
-    saveAllState();
+    registrarFirmaPublica(f, "ficha");
+    saveAllState([DataStore.KEYS.FICHAS]);
     viewFichaDetail(id);
     showToast("Enlace de firma generado");
 }
@@ -2193,7 +2227,7 @@ function saveConfig(e) {
         contabilidadEmail: document.getElementById("cfg-contabilidad-email").value.trim() || DEFAULT_CONFIG.contabilidadEmail,
         publicBaseUrl: document.getElementById("cfg-public-base-url").value.trim().replace(/\/+$/, "")
     };
-    saveAllState();
+    saveAllState([DataStore.KEYS.CONFIG]);
     updateLiveRoutingSummary();
     showToast("Destinatarios y enlace de firma guardados");
 }

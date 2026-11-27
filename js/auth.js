@@ -42,6 +42,7 @@
     };
 
     let sesion = null;
+    let timerRenovacion = null;
 
     function habilitado() {
         return !!(typeof APP_SYSTEM !== "undefined" && APP_SYSTEM.apiAuthUrl);
@@ -57,7 +58,8 @@
             rol: ROLES[rol] ? rol : "LECTURA",
             plantaId: String(valor.plantaId || valor.planta_id || ""),
             exp: Number(valor.exp || 0),
-            token: String(valor.token || "")
+            token: String(valor.token || ""),
+            firebaseToken: String(valor.firebaseToken || "")
         };
     }
 
@@ -123,6 +125,44 @@
 
     function obtenerSesion() {
         return sesion;
+    }
+
+    // Conecta Firebase con el custom token emitido por Apps Script. Si todavía
+    // no está configurada la cuenta de servicio, se mantiene el acceso anónimo
+    // anterior para no interrumpir el sistema mientras se finaliza el cambio.
+    async function conectarFirebase(datosSesion) {
+        if (typeof DataStore === "undefined") return false;
+        if (datosSesion && datosSesion.firebaseToken) {
+            const ok = await DataStore.iniciarSesionFirebase(datosSesion.firebaseToken);
+            if (ok) return true;
+        }
+        return DataStore.iniciarSesionAnonima();
+    }
+
+    function programarRenovacionFirebase() {
+        if (timerRenovacion) window.clearInterval(timerRenovacion);
+        timerRenovacion = window.setInterval(async () => {
+            const actual = sesion;
+            if (!actual || !actual.token) return;
+            const respuesta = await llamar("validar", { token: actual.token });
+            if (!respuesta.ok || !respuesta.sesion) return;
+            guardarSesion(Object.assign({}, respuesta.sesion, { token: actual.token }));
+            await conectarFirebase(respuesta.sesion);
+        }, 50 * 60 * 1000);
+    }
+
+    function solicitarTokenFirma(id, token, tipo) {
+        return llamar("tokenFirmaPublica", { id: id, token: token, tipo: tipo })
+            .then(async respuesta => {
+                if (!respuesta.ok || !respuesta.firebaseToken) return respuesta;
+                await conectarFirebase({ firebaseToken: respuesta.firebaseToken });
+                return respuesta;
+            });
+    }
+
+    function registrarFirmaPublica(datos) {
+        const tokenSesion = (sesion && sesion.token) || "";
+        return llamar("registrarFirma", Object.assign({}, datos || {}, { tokenSesion: tokenSesion }));
     }
 
     function textoEstado(id, mensaje, esError) {
@@ -262,6 +302,8 @@
             const respuesta = await llamar("validar", { token: guardada.token });
             if (respuesta.ok && respuesta.sesion) {
                 guardarSesion(Object.assign({}, respuesta.sesion, { token: guardada.token }));
+                await conectarFirebase(respuesta.sesion);
+                programarRenovacionFirebase();
                 ocultarOverlay();
                 return sesion;
             }
@@ -300,6 +342,7 @@
         guardarSesion(Object.assign({}, respuesta.sesion || {}, {
             token: respuesta.token || (respuesta.sesion && respuesta.sesion.token) || ""
         }));
+        await conectarFirebase(sesion);
         window.location.reload();
     }
 
@@ -494,7 +537,17 @@
     }
 
     function logout() {
+        if (timerRenovacion) {
+            window.clearInterval(timerRenovacion);
+            timerRenovacion = null;
+        }
         limpiarSesion();
+        if (typeof DataStore !== "undefined" && typeof DataStore.cerrarSesionFirebase === "function") {
+            DataStore.cerrarSesionFirebase()
+                .catch(() => {})
+                .then(() => window.location.reload());
+            return;
+        }
         window.location.reload();
     }
 
@@ -508,6 +561,9 @@
         ocultarCrearUsuario: ocultarCrearUsuario,
         logout: logout,
         sesion: obtenerSesion,
+        conectarFirebase: conectarFirebase,
+        solicitarTokenFirma: solicitarTokenFirma,
+        registrarFirmaPublica: registrarFirmaPublica,
         tiene: tiene,
         vistasPermitidas: vistasPermitidas,
         puedeDespacharArea: puedeDespacharArea,

@@ -82,23 +82,29 @@ git push -u origin main
 2. Crear una **Realtime Database**.
 3. En `js/config.js`, confirmar que `FIREBASE_CONFIG` corresponde a ese proyecto.
 4. Activar **Authentication → Sign-in method → Anonymous**.
-   El código ya inicia sesión anónima y espera esa sesión antes de leer/escribir.
-5. Publicar las reglas de `firebase.rules.json` en **Realtime Database → Rules**:
+   Solo se usa como respaldo mientras la cuenta de servicio no esté configurada; la app y la firma pública autentican con custom tokens.
+5. Crear una cuenta de servicio:
+   - Firebase Console → **Project settings** → **Service accounts**.
+   - **Generate new private key** y descargar el JSON.
+   - En Apps Script → **Configuración del proyecto → Propiedades de script**, agregar:
+     - `FIREBASE_SERVICE_CLIENT_EMAIL`: el valor `client_email` del JSON.
+     - `FIREBASE_SERVICE_PRIVATE_KEY`: el valor `private_key` del JSON (con `-----BEGIN PRIVATE KEY-----` y `-----END PRIVATE KEY-----`).
+   - La llave queda solo en Apps Script. No se sube a GitHub ni se envía al navegador.
+6. Volver a publicar el Web App de `AuthWebApp.gs` (**Deploy → New version**) y ejecutar una vez `inicializarAuth()` para crear la hoja `FirmasPublicas`.
+7. Confirmar que el login funcione y que `firmar.html` abra un enlace existente.
+8. Solo entonces publicar las reglas de `firebase.rules.json` en **Realtime Database → Rules**.
 
-```json
-{
-  "rules": {
-    "crearte_produccion": {
-      ".read": "auth != null",
-      ".write": "auth != null"
-    }
-  }
-}
-```
+Las reglas nuevas exigen custom token:
 
-Con reglas públicas (`.read: true`, `.write: true`) cualquiera con la URL puede leer o borrar los datos. La app funciona, pero no es seguro para producción.
+- Usuarios con login: `auth.token.rol` y `auth.token.planta_id`.
+- `LECTURA`: solo lectura.
+- `ADMIN`: config, plantas, fichas, solicitudes y firmas.
+- `FICHAS`: fichas y solicitudes.
+- `TELAS` / `INSUMOS`: solicitudes (despachos).
+- `PLANTA`: solicitudes y lectura general.
+- Firma pública: token con `auth.token.firma === true`, válido únicamente para `ficha_id` y `tipo` autorizados.
 
-Si la autenticación anónima no está habilitada, Firebase rechazará las operaciones y la app seguirá funcionando solo con `localStorage` en cada dispositivo (sin sincronización).
+Con las reglas antiguas (`.read: "auth != null"`, `.write: "auth != null"`) cualquier visitante podía usar la API de Firebase directamente. Con reglas públicas (`.read: true`, `.write: true`) cualquiera podía leer o borrar los datos.
 
 Los datos se guardan bajo `crearte_produccion/{produccion_config|produccion_plantas|produccion_fichas|produccion_solicitudes|produccion_firmas|produccion_firmas_despachos}`.
 La firma de la salida inicial se guarda aparte, en `crearte_produccion/produccion_firmas/{idFicha}`, y la firma de cada despacho de material en `crearte_produccion/produccion_firmas_despachos/{idSolicitud}`. Así no se reescribe la ficha ni la solicitud desde el celular de la planta. La plataforma escucha ambos nodos y muestra la evidencia automáticamente.
@@ -113,6 +119,18 @@ Si no quieres acumular histórico, crea una limpieza programada desde Apps Scrip
 2. Implementar `doPost(e)` para recibir el JSON, validar el token y enviar el correo con los adjuntos.
 3. Copiar la URL `.../exec` a `APP_SYSTEM.apiCorreoPdfUrl` en `js/config.js`.
 4. Configurar la propiedad de script `API_TOKEN` en **Configuración del proyecto → Propiedades de script** y poner el mismo valor en `APP_SYSTEM.tokenIntegracion`. Ya está configurado; si cambias el token, actualiza ambos sitios.
+
+El proyecto `Auth Produccion Crearte` (`google-apps-script/AuthWebApp.gs`) además debe tener:
+
+```text
+USUARIOS_SPREADSHEET_ID       = ID de "Usuarios Produccion Crearte"
+USER_SETUP_KEY                = clave de alta del primer usuario
+AUTH_SECRET                   = se genera solo
+FIREBASE_SERVICE_CLIENT_EMAIL = client_email de la cuenta de servicio
+FIREBASE_SERVICE_PRIVATE_KEY  = private_key de la cuenta de servicio
+```
+
+Después de pegar el código actualizado, crea una nueva versión del Web App y ejecuta `inicializarAuth()` una vez desde el editor. Eso crea la pestaña `FirmasPublicas` en la misma hoja de usuarios.
 
 El formulario de ficha de salida admite **dos archivos**: Ficha Técnica y Salida de Insumos. Ambos se envían en `adjuntosPdf` (arreglo). `adjuntoPdf` se mantiene solo para compatibilidad con versiones anteriores.
 
@@ -200,6 +218,7 @@ El acceso usa una hoja de Google Sheets del Workspace, sin Firebase Authenticati
 2. Crea un proyecto de Apps Script nuevo y pega todo `google-apps-script/AuthWebApp.gs`.
 3. En **Configuración del proyecto → Propiedades de script**, agrega:
    - `USUARIOS_SPREADSHEET_ID`: el ID del spreadsheet del paso 1.
+   - `FIREBASE_SERVICE_CLIENT_EMAIL` y `FIREBASE_SERVICE_PRIVATE_KEY`: los datos de la cuenta de servicio indicados en la sección de Firebase.
 4. En el editor de Apps Script ejecuta una sola vez `inicializarAuth()` y autoriza. En *Registros/Logs* verás la URL de la hoja y la `USER_SETUP_KEY`.
 5. Publica el script como **Web app**:
    - *Execute as:* el dueño del script.
@@ -273,6 +292,10 @@ Columnas de la hoja: `usuario | nombre | correo | rol | planta_id | activo | sal
 - [ ] Despachar una solicitud y confirmar que la planta recibe el correo con el enlace **Firmar recibido** y el botón del Apps Script.
 - [ ] Abrir ese enlace, marcar Recibido y Estado en cada material, firmar y verificar que el estado cambia a **Recibido firmado** en los listados y en la remisión.
 - [ ] Publicar `AuthWebApp.gs`, configurar `USUARIOS_SPREADSHEET_ID` y pegar la URL `/exec` en `APP_SYSTEM.apiAuthUrl`.
+- [ ] Configurar `FIREBASE_SERVICE_CLIENT_EMAIL` y `FIREBASE_SERVICE_PRIVATE_KEY`, ejecutar `inicializarAuth()` y publicar una nueva versión del Web App.
+- [ ] Entrar con un usuario y confirmar que Firebase recibe el custom token (sin errores `permission_denied`).
+- [ ] Abrir un enlace de firma antiguo y uno nuevo; ambos deben cargar con `firmar.html` público.
+- [ ] Publicar `firebase.rules.json` en Realtime Database y repetir la prueba de login y firma.
 - [ ] Crear el primer usuario `ADMIN` con la `USER_SETUP_KEY` y confirmar que la hoja **Usuarios** tiene `salt` y `clave_hash`, nunca la clave en claro.
 - [ ] Crear usuarios `TELAS`, `INSUMOS`, `FICHAS`, `PLANTA` y `LECTURA`; verificar que cada uno ve solo lo suyo.
 - [ ] Confirmar que un usuario `LECTURA` no ve formularios ni botones de edición/despacho.

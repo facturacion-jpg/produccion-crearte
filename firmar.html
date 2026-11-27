@@ -155,6 +155,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="js/config.js"></script>
     <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
     <script>
         const params = new URLSearchParams(window.location.search);
         const fichaId = (params.get("id") || "").trim();
@@ -209,32 +210,53 @@
                 throw new Error("No se pudo conectar con la base de datos. Verifica tu conexión a internet.");
             }
 
-            await dbAuthReady;
-
-            if (esDespacho) {
-                const solicitudesSnap = await dbRealtime.ref("crearte_produccion/produccion_solicitudes").once("value");
-                const solicitudesRaw = solicitudesSnap.val() || [];
-                const solicitudes = Array.isArray(solicitudesRaw) ? solicitudesRaw : Object.values(solicitudesRaw);
-                fichaActual = solicitudes.find(s => s && s.id === fichaId);
-                if (!fichaActual) {
-                    throw new Error("No encontramos el despacho. Puede que aún no se haya guardado en la plataforma.");
+            // El token público se obtiene del Apps Script, que valida id + token.
+            // Mientras esa integración no esté configurada se mantiene la lectura
+            // anterior como respaldo para no interrumpir enlaces ya enviados.
+            let conToken = false;
+            if (window.Auth && typeof Auth.solicitarTokenFirma === "function") {
+                const respuesta = await Auth.solicitarTokenFirma(
+                    fichaId, firmaToken, esDespacho ? "despacho" : "ficha"
+                );
+                if (respuesta.ok && respuesta.registro && respuesta.registro.id) {
+                    fichaActual = respuesta.registro;
+                    conToken = true;
                 }
-                if (fichaActual.estado !== "Despachado") {
-                    throw new Error("Este material todavía no fue despachado. Espera a que Telas o Insumos confirme el despacho.");
-                }
-                const firmaSnap = await dbRealtime.ref("crearte_produccion/produccion_firmas_despachos/" + fichaId).once("value");
-                firmaExistente = firmaSnap.val();
-            } else {
-                const fichasSnap = await dbRealtime.ref("crearte_produccion/produccion_fichas").once("value");
-                const fichasRaw = fichasSnap.val() || [];
-                const fichas = Array.isArray(fichasRaw) ? fichasRaw : Object.values(fichasRaw);
-                fichaActual = fichas.find(f => f && f.id === fichaId);
-                if (!fichaActual) {
-                    throw new Error("No encontramos la remisión. Puede que aún no se haya guardado en la plataforma.");
-                }
-                const firmaSnap = await dbRealtime.ref("crearte_produccion/produccion_firmas/" + fichaId).once("value");
-                firmaExistente = firmaSnap.val();
             }
+
+            if (!conToken) {
+                await DataStore.iniciarSesionAnonima();
+                await dbAuthReady;
+                if (esDespacho) {
+                    const solicitudesSnap = await dbRealtime.ref("crearte_produccion/produccion_solicitudes").once("value");
+                    const solicitudesRaw = solicitudesSnap.val() || [];
+                    const solicitudes = Array.isArray(solicitudesRaw) ? solicitudesRaw : Object.values(solicitudesRaw);
+                    fichaActual = solicitudes.find(s => s && s.id === fichaId);
+                    if (!fichaActual) {
+                        throw new Error("No encontramos el despacho. Puede que aún no se haya guardado en la plataforma.");
+                    }
+                } else {
+                    const fichasSnap = await dbRealtime.ref("crearte_produccion/produccion_fichas").once("value");
+                    const fichasRaw = fichasSnap.val() || [];
+                    const fichas = Array.isArray(fichasRaw) ? fichasRaw : Object.values(fichasRaw);
+                    fichaActual = fichas.find(f => f && f.id === fichaId);
+                    if (!fichaActual) {
+                        throw new Error("No encontramos la remisión. Puede que aún no se haya guardado en la plataforma.");
+                    }
+                }
+            } else {
+                await dbAuthReady;
+            }
+
+            if (esDespacho && fichaActual.estado !== "Despachado") {
+                throw new Error("Este material todavía no fue despachado. Espera a que Telas o Insumos confirme el despacho.");
+            }
+
+            const rutaFirma = esDespacho
+                ? "crearte_produccion/produccion_firmas_despachos/" + fichaId
+                : "crearte_produccion/produccion_firmas/" + fichaId;
+            const firmaSnap = await dbRealtime.ref(rutaFirma).once("value");
+            firmaExistente = firmaSnap.val();
 
             if (!fichaActual.firmaToken || fichaActual.firmaToken !== firmaToken) {
                 throw new Error("El enlace de firma no es válido o fue reemplazado. Solicita uno nuevo.");

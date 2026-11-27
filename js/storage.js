@@ -2,35 +2,53 @@
 // Capa de datos con Firebase Realtime Database - Producción | Crearte By Confeccionarte SAS
 
 let dbRealtime = null;
-// Las lecturas/escrituras esperan a que exista una sesión anónima cuando las
-// reglas de la base de datos exigen autenticación. Si el proveedor no está
-// habilitado en la consola, se continúa igual y Firebase rechazará la operación.
-let dbAuthReady = Promise.resolve(false);
+
+// Firebase ya no entra automáticamente como anónimo. Las operaciones esperan a
+// que la app entregue el custom token del login (o el token de la firma pública).
+// Solo se usa anónimo cuando no hay Web App de autenticación configurada.
+let dbAuthResolver = null;
+let dbAuthResuelto = false;
+let dbAuthReady = new Promise(resolve => { dbAuthResolver = resolve; });
+
+function resolverAuthFirebase(valor) {
+    if (dbAuthResuelto) return;
+    dbAuthResuelto = true;
+    if (dbAuthResolver) dbAuthResolver(!!valor);
+}
+
+function reiniciarAuthFirebase() {
+    dbAuthResuelto = false;
+    dbAuthReady = new Promise(resolve => { dbAuthResolver = resolve; });
+}
+
 try {
     if (window.firebase && typeof FIREBASE_CONFIG !== "undefined") {
         if (!firebase.apps.length) {
             firebase.initializeApp(FIREBASE_CONFIG);
         }
         if (firebase.auth) {
-            dbAuthReady = new Promise(resolve => {
-                firebase.auth().onAuthStateChanged(user => {
-                    if (user) {
-                        resolve(true);
-                        return;
-                    }
-                    firebase.auth().signInAnonymously()
-                        .then(() => resolve(true))
-                        .catch(err => {
-                            console.warn("Autenticación anónima no disponible:", err.code || err);
-                            resolve(false);
-                        });
-                });
+            firebase.auth().onAuthStateChanged(user => {
+                if (user) resolverAuthFirebase(true);
             });
+            const sinLogin = typeof APP_SYSTEM === "undefined" || !APP_SYSTEM.apiAuthUrl;
+            if (sinLogin) {
+                firebase.auth().signInAnonymously()
+                    .then(() => resolverAuthFirebase(true))
+                    .catch(err => {
+                        console.warn("Autenticación anónima no disponible:", err.code || err);
+                        resolverAuthFirebase(false);
+                    });
+            }
+        } else {
+            resolverAuthFirebase(false);
         }
         dbRealtime = firebase.database();
+    } else {
+        resolverAuthFirebase(false);
     }
 } catch (err) {
     console.warn("Firebase operando en modo respaldo local:", err);
+    resolverAuthFirebase(false);
 }
 
 const SafeStorage = (() => {
@@ -125,6 +143,42 @@ const DataStore = {
                 datos: payload
             })
         }).catch(() => {});
+    },
+
+    async iniciarSesionFirebase(firebaseToken) {
+        if (!window.firebase || !firebase.auth || !firebaseToken) return false;
+        try {
+            await firebase.auth().signInWithCustomToken(firebaseToken);
+            resolverAuthFirebase(true);
+            return true;
+        } catch (err) {
+            console.warn("No se pudo autenticar Firebase con el token de sesión:", err.code || err);
+            return false;
+        }
+    },
+
+    async iniciarSesionAnonima() {
+        if (!window.firebase || !firebase.auth) return false;
+        try {
+            if (!firebase.auth().currentUser) {
+                await firebase.auth().signInAnonymously();
+            }
+            resolverAuthFirebase(true);
+            return true;
+        } catch (err) {
+            console.warn("Autenticación anónima no disponible:", err.code || err);
+            return false;
+        }
+    },
+
+    async cerrarSesionFirebase() {
+        if (!window.firebase || !firebase.auth) return;
+        try {
+            await firebase.auth().signOut();
+        } catch (err) {
+            console.warn("Error cerrando sesión de Firebase:", err.code || err);
+        }
+        reiniciarAuthFirebase();
     },
 
     async enviarCorreoConPdf(datosCorreo) {
