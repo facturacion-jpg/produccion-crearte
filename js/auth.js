@@ -163,8 +163,9 @@
         return "auth_" + Math.random().toString(36).slice(2) + "_" + Date.now().toString(36);
     }
 
-    // Apps Script no devuelve cabeceras CORS. El navegador envía un formulario
-    // oculto a un iframe y el Web App responde con un postMessage firmado por nonce.
+    // Apps Script no devuelve cabeceras CORS y usa X-Frame-Options, así que un
+    // iframe oculto no sirve. El payload va por POST opaco y el resultado se lee
+    // con JSONP (<script src>), usando un nonce como clave de correlación.
     function llamar(accion, datos) {
         return new Promise(resolve => {
             if (!habilitado()) {
@@ -173,50 +174,70 @@
             }
 
             const nonce = nuevoNonce();
-            const iframe = document.createElement("iframe");
-            const form = document.createElement("form");
-            const input = document.createElement("input");
+            const cb = "crearteAuthCb_" + nonce.replace(/[^A-Za-z0-9_$]/g, "_");
             const timeoutMs = 25000;
+            const mensajeError = "No se pudo contactar con el servidor de usuarios. Revisa la URL del Web App y vuelve a intentar.";
             let terminado = false;
+            let script = null;
+            let timer = null;
+            let pollTimer = null;
 
-            iframe.name = "auth-frame-" + nonce;
-            iframe.style.display = "none";
-            iframe.setAttribute("aria-hidden", "true");
-
-            form.method = "POST";
-            form.action = APP_SYSTEM.apiAuthUrl;
-            form.target = iframe.name;
-            form.style.display = "none";
-
-            input.type = "hidden";
-            input.name = "payload";
-            input.value = JSON.stringify({ accion: accion, datos: datos || {}, nonce: nonce });
+            function limpiar() {
+                if (timer) window.clearTimeout(timer);
+                if (pollTimer) window.clearTimeout(pollTimer);
+                if (script && script.parentNode) script.parentNode.removeChild(script);
+                try { delete window[cb]; } catch (err) { window[cb] = undefined; }
+            }
 
             function finalizar(resultado) {
                 if (terminado) return;
                 terminado = true;
-                window.removeEventListener("message", onMessage);
-                window.clearTimeout(timer);
-                if (form.parentNode) form.parentNode.removeChild(form);
-                if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+                limpiar();
                 resolve(resultado);
             }
 
-            function onMessage(evento) {
-                const datosMsg = evento && evento.data;
-                if (!datosMsg || datosMsg.nonce !== nonce) return;
-                finalizar(datosMsg.resultado || { ok: false, mensaje: "Respuesta inesperada del servidor." });
+            function consultar() {
+                if (terminado) return;
+                if (script && script.parentNode) script.parentNode.removeChild(script);
+                script = document.createElement("script");
+                script.async = true;
+                script.src = APP_SYSTEM.apiAuthUrl +
+                    (APP_SYSTEM.apiAuthUrl.indexOf("?") >= 0 ? "&" : "?") +
+                    "accion=resultado&nonce=" + encodeURIComponent(nonce) +
+                    "&cb=" + encodeURIComponent(cb) + "&_=" + Date.now();
+                script.onerror = function () {
+                    finalizar({ ok: false, mensaje: mensajeError });
+                };
+                document.head.appendChild(script);
             }
 
-            const timer = window.setTimeout(() => {
-                finalizar({ ok: false, mensaje: "No se pudo contactar con el servidor de usuarios. Revisa la URL del Web App y vuelve a intentar." });
+            window[cb] = function (respuesta) {
+                if (!respuesta || respuesta.nonce !== nonce) return;
+                if (respuesta.pendiente) {
+                    pollTimer = window.setTimeout(consultar, 400);
+                    return;
+                }
+                finalizar(respuesta.resultado || { ok: false, mensaje: mensajeError });
+            };
+
+            timer = window.setTimeout(() => {
+                finalizar({ ok: false, mensaje: mensajeError });
             }, timeoutMs);
 
-            window.addEventListener("message", onMessage);
-            form.appendChild(input);
-            document.body.appendChild(iframe);
-            document.body.appendChild(form);
-            form.submit();
+            try {
+                const cuerpo = new URLSearchParams();
+                cuerpo.append("payload", JSON.stringify({ accion: accion, datos: datos || {}, nonce: nonce }));
+                fetch(APP_SYSTEM.apiAuthUrl, {
+                    method: "POST",
+                    mode: "no-cors",
+                    credentials: "omit",
+                    body: cuerpo.toString()
+                }).catch(function () { /* la respuesta es opaca; se consulta por JSONP */ });
+            } catch (err) {
+                // Si fetch no existe, el JSONP responderá "pendiente" hasta el timeout.
+            }
+
+            pollTimer = window.setTimeout(consultar, 700);
         });
     }
 

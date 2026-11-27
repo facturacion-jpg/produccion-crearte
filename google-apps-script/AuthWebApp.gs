@@ -25,7 +25,11 @@ const AUTH_ENCABEZADOS = [
 ];
 const AUTH_ROLES = ["ADMIN", "FICHAS", "TELAS", "INSUMOS", "PLANTA", "LECTURA"];
 
-function doGet() {
+function doGet(e) {
+    const params = (e && e.parameter) || {};
+    if (String(params.accion || "") === "resultado") {
+        return entregarResultado(String(params.nonce || ""), String(params.cb || ""));
+    }
     return HtmlService.createHtmlOutput(
         "<pre>AuthWebApp activo. Use la URL /exec desde js/config.js (APP_SYSTEM.apiAuthUrl).</pre>"
     );
@@ -49,21 +53,52 @@ function doPost(e) {
     } catch (err) {
         resultado = { ok: false, mensaje: String(err && err.message ? err.message : err) };
     }
-    return responderAlPadre(resultado, String((data && data.nonce) || ""));
+
+    // El navegador no puede leer la respuesta (sin CORS y con X-Frame-Options),
+    // así que guardamos el resultado unos segundos y se consulta por JSONP.
+    const nonce = String((data && data.nonce) || "");
+    if (nonce) {
+        try {
+            CacheService.getScriptCache().put(claveResultado(nonce), JSON.stringify(resultado), 60);
+        } catch (err) {
+            resultado = { ok: false, mensaje: "No se pudo guardar la respuesta. Intenta de nuevo." };
+        }
+    }
+    return ContentService.createTextOutput("ok").setMimeType(ContentService.MimeType.TEXT);
 }
 
-// -----------------------------------------------------------------------------
-// Respuesta sin CORS: el navegador abre el formulario en un iframe oculto y
-// esta página le devuelve el resultado con postMessage.
-// -----------------------------------------------------------------------------
-function responderAlPadre(resultado, nonce) {
-    const json = JSON.stringify(resultado)
+function claveResultado(nonce) {
+    return "crearte_auth_" + nonce;
+}
+
+// El cliente consulta con <script src>; la respuesta es JavaScript y se ejecuta
+// dentro de la página de la app, sin depender de CORS ni de iframes.
+function entregarResultado(nonce, cb) {
+    const cache = CacheService.getScriptCache();
+    const clave = claveResultado(nonce);
+    const guardado = cache.get(clave);
+    if (!guardado) {
+        return responderJsonp({ nonce: nonce, pendiente: true }, cb);
+    }
+    cache.remove(clave);
+    let resultado;
+    try {
+        resultado = JSON.parse(guardado);
+    } catch (err) {
+        resultado = { ok: false, mensaje: "Respuesta inválida del servidor." };
+    }
+    return responderJsonp({ nonce: nonce, pendiente: false, resultado: resultado }, cb);
+}
+
+function responderJsonp(objeto, cb) {
+    const nombre = /^[A-Za-z0-9_$]+$/.test(String(cb || "")) ? String(cb) : "crearteAuthCb";
+    const json = JSON.stringify(objeto)
         .replace(/</g, "\\u003c")
-        .replace(/>/g, "\\u003e");
-    const html = "<!doctype html><html><head><meta charset='utf-8'></head><body>" +
-        "<script>window.parent.postMessage({ nonce: " + JSON.stringify(nonce) +
-        ", resultado: " + json + " }, '*');<\/script></body></html>";
-    return HtmlService.createHtmlOutput(html);
+        .replace(/>/g, "\\u003e")
+        .replace(/\\u2028/g, "\\u2028")
+        .replace(/\\u2029/g, "\\u2029");
+    const js = "window." + nombre + "(" + json + ");";
+    return ContentService.createTextOutput(js).setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
 function manejarAuth(data) {
