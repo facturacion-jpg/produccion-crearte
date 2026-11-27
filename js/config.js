@@ -12,7 +12,7 @@ const APP_SYSTEM = {
     apiCorreoPdfUrl: "https://script.google.com/macros/s/AKfycbym1iYMtBp10Hz8i_U2MD-MrRDGTCQdFBtKztpzK3_MVVBj9k0w5VSrmcuYM97lwmak/exec",
     // Web App de Apps Script para login con Google Sheets. Vacío = sin login.
     // Ejemplo: "https://script.google.com/macros/s/AKfycb.../exec"
-    apiAuthUrl: "",
+    apiAuthUrl: "https://script.google.com/macros/s/AKfycbw9mU3jE4Z-Y8xPKxIZHsuVBPUUskQwlQOgYNJN1koDYGmJBMXEHoIrCTvk3E2sIgQi/exec",
     // URL pública del sitio (GitHub Pages). Se usa para armar el enlace de firma.
     // Sin barra final. Si está vacío se usa el origen actual.
     publicBaseUrl: "https://facturacion-jpg.github.io/produccion-crearte",
