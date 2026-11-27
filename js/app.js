@@ -141,6 +141,21 @@ function puedeVerVista(vista) {
     return Auth.vistasPermitidas().indexOf(vista) >= 0;
 }
 
+// Solo el usuario PLANTA al que pertenece el documento puede abrir el enlace
+// de firma desde la interfaz. ADMIN y LECTURA ven el estado, pero no firman.
+function plantaAutorizadaParaFirmar(registro) {
+    if (!conAuth()) return true;
+    const s = Auth.sesion();
+    if (!s || s.rol !== "PLANTA" || !s.plantaId) return false;
+    return s.plantaId === String(registro?.plantaId || "");
+}
+
+function nombrePlantaRegistro(registro) {
+    if (registro?.plantaNombre) return registro.plantaNombre;
+    const planta = (appPlantas || []).find(p => p.id === registro?.plantaId);
+    return planta ? planta.nombre : "la planta asignada";
+}
+
 function requierePermiso(permiso, area) {
     if (!puedeHacer(permiso)) {
         showToast("Tu usuario no tiene permiso para realizar esta acción.");
@@ -642,6 +657,11 @@ function obtenerBaseUrlPublica() {
     return `${location.origin}${location.pathname.replace(/[^/]*$/, "")}`;
 }
 
+function lineaUrlPlataforma() {
+    const base = obtenerBaseUrlPublica();
+    return base ? `PORTAL DE PRODUCCIÓN (ingreso con usuario y clave): ${base}\n` : "";
+}
+
 function generarTokenFirma() {
     if (window.crypto && typeof window.crypto.getRandomValues === "function") {
         const bytes = new Uint8Array(16);
@@ -704,6 +724,8 @@ function handlePreviewFichaSalida(e) {
 
     const subject = `[FICHA TÉCNICA + SALIDA] ${ref} - ${prenda} | ${APP_SYSTEM.empresa}`;
     const body = `Estimados ${planta.nombre} (${planta.contacto}),\n\n` +
+        lineaUrlPlataforma() +
+        `\n` +
         `Desde el área de ${APP_SYSTEM.nombreApp} de ${APP_SYSTEM.empresa} (${APP_SYSTEM.nit || "NIT. 901.367.620-0"}), remitimos la Ficha Técnica y la Orden de Salida Inicial de materiales:\n\n` +
         `====================================================\n` +
         `ID REMISIÓN: ${ftId}\n` +
@@ -849,7 +871,7 @@ function renderCentralView() {
                                 ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold" title="Firmada por ${escapeHtml(appFirmas[f.id].nombre || "planta")}${Array.isArray(appFirmas[f.id].items) && appFirmas[f.id].items.length ? ` · ${appFirmas[f.id].items.length} ítem(s) confirmado(s)` : ""}">
                                     <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Firmada${Array.isArray(appFirmas[f.id].items) && appFirmas[f.id].items.length ? " · Ítems OK" : ""}
                                 </span>`
-                                : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-semibold">
+                                : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-semibold" title="Pendiente de firma por ${escapeHtml(f.plantaNombre || nombrePlantaRegistro(f))}">
                                     <i data-lucide="clock" class="w-3.5 h-3.5"></i> Firma pendiente
                                 </span>`}
                         </div>
@@ -1020,6 +1042,8 @@ function handlePreviewSolicitudPlanta(e) {
     const isSplit = telaItems.length > 0 && insumoItems.length > 0;
     const subject = `[SOLICITUD MATERIAL - ${urgencia.toUpperCase()}] ${planta.nombre} | Ref: ${ref} | ${APP_SYSTEM.empresa}`;
     const body = `Solicitud de materiales radicada en ${APP_SYSTEM.nombreApp} (${APP_SYSTEM.empresa}):\n\n` +
+        lineaUrlPlataforma() +
+        `\n` +
         `PLANTA SOLICITANTE: ${planta.nombre} (${planta.ciudad})\n` +
         `REFERENCIA: ${ref} | LOTE/OP: ${lote}\n` +
         `MOTIVO: ${motivo} | URGENCIA: ${urgencia.toUpperCase()}\n` +
@@ -1160,9 +1184,9 @@ function renderPlantaView() {
                        <div class="text-[11px] font-mono text-zinc-900 font-bold">Guía: ${s.despachoInfo?.remision}</div>
                        ${s.firmaRecibido
                            ? `<div class="text-[10px] font-bold text-emerald-700"><i data-lucide="check-circle" class="w-3 h-3 inline"></i> Recibido firmado: ${escapeHtml(s.firmaRecibido.nombre || "planta")}</div>`
-                           : s.firmaUrl
+                           : s.firmaUrl && plantaAutorizadaParaFirmar(s)
                                ? `<a href="${escapeHtml(s.firmaUrl)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[10px] font-extrabold text-zinc-950 underline decoration-yellow-400 decoration-2"><i data-lucide="pen-line" class="w-3 h-3"></i> Firmar recibido</a>`
-                               : `<div class="text-[10px] font-semibold text-amber-700">Firma pendiente</div>`}
+                               : `<div class="text-[10px] font-semibold text-amber-700">Pendiente de firma por ${escapeHtml(nombrePlantaRegistro(s))}</div>`}
                    </div>`
                 : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-yellow-200 text-zinc-950">
                        <span class="w-1.5 h-1.5 rounded-full bg-zinc-950 animate-pulse"></span> Pendiente
@@ -1670,6 +1694,8 @@ async function confirmDispatch(e) {
         cc: [appConfig.ingEmail, areaEmail].filter(Boolean).join(", "),
         asunto: `[FIRMAR RECIBIDO] ${sol.id} | ${planta?.nombre || sol.plantaNombre} | Remisión ${remision}`,
         cuerpo: `Estimados ${planta?.nombre || sol.plantaNombre} (${planta?.contacto || "planta"}),\n\n` +
+            lineaUrlPlataforma() +
+            `\n` +
             `${areaNombre} despachó el material que solicitaste. Confirma que lo recibiste firmando electrónicamente y marcando el estado de cada material.\n\n` +
             `SOLICITUD: ${sol.id}\n` +
             `REMISIÓN / GUÍA: ${remision}\n` +
@@ -2034,11 +2060,13 @@ function viewFichaDetail(id) {
         ${f.notas ? `<div class="p-3 rounded-xl bg-yellow-50 border border-yellow-300 text-xs"><strong>Especificaciones:</strong> ${escapeHtml(f.notas)}</div>` : ""}
         ${!appFirmas[f.id] ? `
             <div class="mt-3 no-print">
-                ${f.firmaUrl
+                ${f.firmaUrl && plantaAutorizadaParaFirmar(f)
                     ? `<a href="${escapeHtml(f.firmaUrl)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-zinc-950 text-yellow-400 hover:bg-zinc-800"><i data-lucide="pen-line" class="w-3.5 h-3.5"></i> Abrir enlace de firma</a>`
-                    : (puedeHacer("fichas")
-                        ? `<button type="button" onclick="generarEnlaceFirma('${f.id}')" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-zinc-950 text-yellow-400 hover:bg-zinc-800"><i data-lucide="link" class="w-3.5 h-3.5"></i> Generar enlace de firma</button>`
-                        : `<span class="text-[11px] font-semibold text-zinc-500">Enlace de firma pendiente</span>`)}
+                    : f.firmaUrl
+                        ? `<span class="text-[11px] font-semibold text-amber-700">Pendiente de firma por ${escapeHtml(nombrePlantaRegistro(f))}</span>`
+                        : (puedeHacer("fichas")
+                            ? `<button type="button" onclick="generarEnlaceFirma('${f.id}')" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-zinc-950 text-yellow-400 hover:bg-zinc-800"><i data-lucide="link" class="w-3.5 h-3.5"></i> Generar enlace de firma</button>`
+                            : `<span class="text-[11px] font-semibold text-zinc-500">Enlace de firma pendiente</span>`)}
             </div>
         ` : ""}
         ${buildFirmasRemisionHTML(f)}
@@ -2123,7 +2151,9 @@ function viewSolicitudDetail(id) {
             <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-xs mb-4">
                 <div class="font-extrabold">Firma de recibido pendiente</div>
                 <div class="mt-1">Se envió el enlace a <strong>${escapeHtml(s.firmaEmailPara || s.plantaNombre)}</strong>. La planta debe confirmar Recibido (Sí/No) y Estado de cada material.</div>
-                <a href="${escapeHtml(s.firmaUrl)}" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold bg-zinc-950 text-yellow-400"><i data-lucide="pen-line" class="w-3.5 h-3.5"></i> Abrir enlace de firma</a>
+                ${plantaAutorizadaParaFirmar(s)
+                    ? `<a href="${escapeHtml(s.firmaUrl)}" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold bg-zinc-950 text-yellow-400"><i data-lucide="pen-line" class="w-3.5 h-3.5"></i> Abrir enlace de firma</a>`
+                    : `<div class="mt-2 text-[11px] font-semibold text-amber-700">Pendiente de firma por ${escapeHtml(nombrePlantaRegistro(s))}</div>`}
             </div>
         ` : ""}
         ${buildFirmasRemisionHTML(s)}

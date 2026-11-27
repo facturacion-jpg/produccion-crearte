@@ -116,7 +116,7 @@ Si no quieres acumular histórico, crea una limpieza programada desde Apps Scrip
 
 El formulario de ficha de salida admite **dos archivos**: Ficha Técnica y Salida de Insumos. Ambos se envían en `adjuntosPdf` (arreglo). `adjuntoPdf` se mantiene solo para compatibilidad con versiones anteriores.
 
-El correo incluye el enlace público `firmar.html?id=...&token=...` y el campo `firmaUrl` en el payload; para despachos el enlace es `firmar.html?tipo=despacho&id=...&token=...`. La versión publicada del Script genera además un `htmlBody` con el botón **Firmar recibido**. El enlace solo funciona si la URL pública está configurada en *Configuración* o en `js/config.js`. El Script debe aceptar los nuevos `tipoEvento`: `DESPACHO_MATERIAL_FIRMA` y `COBRO_CONTABILIDAD`.
+El correo incluye el enlace público `firmar.html?id=...&token=...` y el campo `firmaUrl` en el payload; para despachos el enlace es `firmar.html?tipo=despacho&id=...&token=...`. También incluye una línea **PORTAL DE PRODUCCIÓN** con la URL pública de la app para que la persona pueda entrar con su usuario y clave desde el correo. La versión publicada del Script genera además un `htmlBody` con el botón **Firmar recibido**. El enlace solo funciona si la URL pública está configurada en *Configuración* o en `js/config.js`. El Script debe aceptar los nuevos `tipoEvento`: `DESPACHO_MATERIAL_FIRMA` y `COBRO_CONTABILIDAD`.
 
 ```javascript
 function doPost(e) {
@@ -186,7 +186,7 @@ El token viaja en el código del navegador: sirve como filtro básico, **no como
 
 - Sí: cuando Telas o Insumos confirma un despacho, se envía además un correo (`tipoEvento: DESPACHO_MATERIAL_FIRMA`) a la planta solicitante (correo registrado en su ficha del panel de plantas), con copia a Ingeniería y al área que despachó.
 - Ese correo trae el enlace `firmar.html?tipo=despacho&id=...&token=...` para que la planta confirme **Recibido (Sí/No)** y **Estado** de cada material, agregue observaciones y dibuje su firma. El token se genera al despachar y queda guardado en la solicitud.
-- La firma se guarda en `crearte_produccion/produccion_firmas_despachos/{idSolicitud}`. Los listados muestran **Recibido firmado: nombre**; antes de firmar muestran un enlace **Firmar recibido**, y la remisión incluye la firma de la planta y la del despachador del área correspondiente.
+- La firma se guarda en `crearte_produccion/produccion_firmas_despachos/{idSolicitud}`. Los listados muestran **Recibido firmado: nombre**; antes de firmar muestran un enlace **Firmar recibido** solo al usuario `PLANTA` dueño de esa solicitud, y la remisión incluye la firma de la planta y la del despachador del área correspondiente. ADMIN y LECTURA ven el estado **Pendiente de firma por ...**, pero no pueden abrir el formulario de firma desde la interfaz.
 - Si la planta no tiene correo configurado, el despacho se registra igual y se avisa en consola; el enlace queda disponible al abrir la remisión.
 - Para que el botón llegue al correo, configura la **URL pública del sitio** en *Configuración → Enlaces de firma electrónica* (o `publicBaseUrl` en `js/config.js`).
 
@@ -258,7 +258,7 @@ Columnas de la hoja: `usuario | nombre | correo | rol | planta_id | activo | sal
 - [ ] Cambiar entre *Gestión Central* y *Planta Externa*.
 - [ ] Crear una ficha de prueba y revisar que la tabla tenga las seis filas: Bultos de piezas cortadas, Plantillas y Molderia, Set de tallas, Retazo de tela, Insumos y etiquetas y Muestra Fisica.
 - [ ] Adjuntar Ficha Técnica y Salida de Insumos; revisar que ambos nombres aparezcan en la previsualización.
-- [ ] Confirmar que el correo incluye el enlace y el botón **Firmar recibido**.
+- [ ] Confirmar que el correo incluye el enlace, el botón **Firmar recibido** y la línea **PORTAL DE PRODUCCIÓN** con la URL pública.
 - [ ] Abrir el enlace desde el celular, marcar **Recibido** y **Estado** en cada ítem, dibujar la firma y confirmar. La remisión debe mostrar la firma, el estado **Firmada** y los valores confirmados por la planta sin recargar la plataforma.
 - [ ] Confirmar que la remisión muestra la firma automática del despachador y la nota de dos días hábiles.
 - [ ] Confirmar que el correo llega con ambos PDF (la app no podrá confirmarlo por CORS).
