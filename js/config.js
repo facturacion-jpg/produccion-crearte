@@ -13,9 +13,9 @@ const APP_SYSTEM = {
     // Web App de Apps Script para login con Google Sheets. Vacío = sin login.
     // Ejemplo: "https://script.google.com/macros/s/AKfycb.../exec"
     apiAuthUrl: "",
-    // URL pública del sitio en Render. Se usa para armar el enlace de firma.
-    // Ejemplo: "https://produccion-crearte.onrender.com". Si está vacío se usa el origen actual.
-    publicBaseUrl: "",
+    // URL pública del sitio (GitHub Pages). Se usa para armar el enlace de firma.
+    // Sin barra final. Si está vacío se usa el origen actual.
+    publicBaseUrl: "https://facturacion-jpg.github.io/produccion-crearte",
     panelCentralUrl: "",
     // Se envía al Script dentro del payload como comprobación básica.
     // NO es un secreto: viaja en el código del navegador. No usar contraseñas aquí.

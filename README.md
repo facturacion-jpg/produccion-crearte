@@ -4,11 +4,11 @@ Aplicación estática para control de fichas técnicas, salidas y solicitudes a 
 
 ## Arquitectura de despliegue
 
-- **Frontend:** sitio estático (HTML + CSS + JS). Se publica en Render como *Static Site*.
+- **Frontend:** sitio estático (HTML + CSS + JS). Se publica en **GitHub Pages** desde la rama `main`. Render queda como alternativa con `render.yaml`.
 - **Datos:** Firebase Realtime Database (sincronización PC ↔ celular). `localStorage` funciona como respaldo local.
 - **Correo y PDF:** Google Apps Script publicado como *Web App*. No se necesita servidor propio.
 
-No hay código de backend que compilar: Render solo sirve archivos.
+No hay código de backend que compilar: GitHub Pages solo sirve archivos.
 
 ## Estructura
 
@@ -25,7 +25,7 @@ js/vendor/lucide.min.js  Iconos Lucide locales
 js/config.js          URLs, token y configuración de Firebase  <-- editar al desplegar
 js/storage.js         Persistencia, Firebase y envío al Script
 js/app.js             Lógica de la interfaz
-render.yaml           Blueprint opcional para Render
+render.yaml           Blueprint opcional para Render (alternativa a GitHub Pages)
 ```
 
 ## Estilos locales (sin CDN)
@@ -46,7 +46,7 @@ No hace falta subir el ejecutable: solo se genera `css/tailwind.css`.
 
 ### 1. Repositorio
 
-Render despliega desde Git. Si aún no tienes repositorio:
+GitHub Pages despliega desde Git. Si aún no tienes repositorio:
 
 ```bash
 git init
@@ -56,7 +56,15 @@ git remote add origin URL_DE_TU_REPO
 git push -u origin main
 ```
 
-### 2. Render (Static Site)
+### 2. GitHub Pages (despliegue actual)
+
+- En el repositorio: **Settings → Pages → Source: Deploy from a branch**.
+- Rama: `main`, carpeta `/ (root)`, luego **Save**.
+- URL pública: `https://facturacion-jpg.github.io/produccion-crearte/`.
+- Esa URL ya está fijada en `js/config.js` → `APP_SYSTEM.publicBaseUrl` (sin barra final). También se puede cambiar desde **Gestión Central → Configuración → Enlaces de firma electrónica**.
+- Se usa para armar el enlace de firma que recibe la planta: `https://facturacion-jpg.github.io/produccion-crearte/firmar.html?...`.
+
+#### Alternativa: Render (Static Site)
 
 - *New* → **Static Site**.
 - Repositorio y rama: `main`.
@@ -64,8 +72,7 @@ git push -u origin main
 - **Build Command:** vacío.
 - **Publish Directory:** `.`.
 - O alternativamente usa `render.yaml` con *Deploy from blueprint*.
-- Cuando Render te dé la URL pública, pégala en **Gestión Central → Configuración → Enlaces de firma electrónica** (campo **URL pública del sitio**) o en `js/config.js` → `APP_SYSTEM.publicBaseUrl` / `DEFAULT_CONFIG.publicBaseUrl`.
-  Ejemplo: `https://produccion-crearte.onrender.com` (sin barra final). Se usa para armar el enlace de firma que recibe la planta. Si queda vacío y abres la app desde `file://`, el correo no podrá incluir un enlace válido: verás el texto “Enlace disponible cuando el sitio esté publicado”.
+- Si publicas en Render, cambia `APP_SYSTEM.publicBaseUrl` por la URL que te dé Render (sin barra final).
 
 > Todas las rutas del proyecto son relativas (`css/...`, `js/...`, `img/...`), así que funciona tanto en la raíz como en un subdirectorio.
 
