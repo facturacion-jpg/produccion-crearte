@@ -308,7 +308,9 @@
             return;
         }
 
-        guardarSesion(respuesta.sesion || respuesta);
+        guardarSesion(Object.assign({}, respuesta.sesion || {}, {
+            token: respuesta.token || (respuesta.sesion && respuesta.sesion.token) || ""
+        }));
         window.location.reload();
     }
 
