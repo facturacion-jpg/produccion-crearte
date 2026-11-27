@@ -349,7 +349,8 @@ function inicializarAuth() {
             "USER_SETUP_KEY", "Crearte-Alta-" + Utilities.getUuid().slice(0, 8)
         );
     }
-    Logger.log("Hoja: " + hoja.getUrl());
+    const url = hoja.getParent().getUrl();
+    Logger.log("Hoja: " + url);
     Logger.log("USER_SETUP_KEY: " + propiedad("USER_SETUP_KEY"));
-    return hoja.getUrl();
+    return url;
 }
