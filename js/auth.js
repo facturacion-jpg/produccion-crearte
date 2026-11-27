@@ -231,6 +231,7 @@
                     method: "POST",
                     mode: "no-cors",
                     credentials: "omit",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
                     body: cuerpo.toString()
                 }).catch(function () { /* la respuesta es opaca; se consulta por JSONP */ });
             } catch (err) {
