@@ -25,9 +25,24 @@ img/logo-dark.png     Versión clara del logotipo, usada en cabeceras oscuras
 js/vendor/lucide.min.js  Iconos Lucide locales
 js/config.js          URLs, token y configuración de Firebase  <-- editar al desplegar
 js/storage.js         Persistencia, Firebase y envío al Script
-js/app.js             Lógica de la interfaz
+js/app.js             Lógica de la interfaz y arranque de la aplicación
+js/botones/           Botones principales, un archivo por botón
 render.yaml           Blueprint opcional para Render (alternativa a GitHub Pages)
 ```
+
+### Botones principales (cambiar uno sin buscar en todo el código)
+
+Los botones del conmutador de portales y de las pestañas de Gestión Central ya no están escritos directamente en `index.html`. Cada uno tiene su propio archivo:
+
+| Botón | Archivo |
+| --- | --- |
+| 1. Gestión Central | `js/botones/portal-central.js` |
+| 2. Planta Externa | `js/botones/portal-planta.js` |
+| Enviar Ficha + Salida | `js/botones/central-enviar.js` |
+| Solicitudes y Despachos | `js/botones/central-despachos.js` |
+| Destinatarios y Plantas | `js/botones/central-config.js` |
+
+Para cambiar el texto, el icono, los colores o el badge de un botón, edita **solo su archivo**. `js/botones/registry.js` arma los botones en los contenedores `#portales-botones` y `#central-subtabs`, y `js/app.js` mantiene la lógica de permisos y navegación (`switchRole` / `switchSubTab`). No es necesario tocar el HTML ni el resto de la lógica.
 
 ## Estilos locales (sin CDN)
 

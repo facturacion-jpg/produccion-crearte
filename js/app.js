@@ -34,6 +34,10 @@ function renderIcons() {
 // INICIALIZACIÓN
 // =====================================================================
 window.addEventListener("DOMContentLoaded", async () => {
+    // Los botones principales se arman antes de aplicar permisos y renderizar.
+    if (typeof renderBotonesPrincipales === "function") {
+        renderBotonesPrincipales();
+    }
     // Si hay login configurado, la sessión se valida antes de mostrar los datos.
     if (window.Auth && typeof Auth.iniciar === "function") {
         await Auth.iniciar();
