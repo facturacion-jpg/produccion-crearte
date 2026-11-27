@@ -169,6 +169,11 @@ function aplicarPermisosAuth() {
         if (nombreChip) nombreChip.textContent = s.nombre || s.usuario;
     }
 
+    const crearUsuarioBtn = document.getElementById("auth-crear-usuario-btn");
+    if (crearUsuarioBtn) {
+        crearUsuarioBtn.classList.toggle("hidden", !s || s.rol !== "ADMIN");
+    }
+
     const vistas = activo ? Auth.vistasPermitidas() : ["central", "planta"];
     if (vistas.indexOf(currentRole) < 0) currentRole = vistas[0] || "central";
 

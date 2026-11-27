@@ -205,7 +205,7 @@ El acceso usa una hoja de Google Sheets del Workspace, sin Firebase Authenticati
    - *Execute as:* el dueño del script.
    - *Who has access:* **Anyone**.
 6. Copia la URL `.../exec` y pégala en `APP_SYSTEM.apiAuthUrl` dentro de `js/config.js`.
-7. Recarga la app. En el primer acceso pulsa **Crear usuario y clave**, digita la `USER_SETUP_KEY` y crea el usuario `ADMIN`. A partir de ahí, los usuarios nuevos los crea ese administrador desde el mismo formulario.
+7. Recarga la app. En el primer acceso abre la pestaña **Crear usuario**, digita la `USER_SETUP_KEY` y crea el usuario `ADMIN`. A partir de ahí, los usuarios nuevos los crea ese administrador desde el botón **+** que aparece en la barra superior.
 
 Estado actual del despliegue:
 
@@ -217,9 +217,25 @@ Estado actual del despliegue:
 
 Si `APP_SYSTEM.apiAuthUrl` queda vacío, el login se desactiva y la app entra directamente (útil mientras terminas la configuración).
 
+#### Cómo crear usuarios y ligarlos a una planta
+
+1. Entra como **ADMIN**.
+2. En la barra negra superior aparece un botón **+** junto a tu nombre. Púlsalo para abrir **Crear usuario**.
+3. Llena:
+   - **Usuario para entrar**: el nombre con el que hará login, sin espacios (ejemplo: `planta.norte`).
+   - **Nombre completo** y **Correo** (opcional): solo para identificar a la persona.
+   - **Rol del usuario**: define lo que puede hacer. En la tarjeta aparece una explicación debajo del desplegable.
+   - **Planta asignada**: aparece solo cuando eliges el rol **Planta externa**. Selecciona la planta real (por ejemplo, *Taller Aliado Norte (Bello)*).
+   - **Clave inicial**: mínimo 6 caracteres. Entregasela al usuario; en la hoja se guarda cifrada.
+4. Pulsa **Crear usuario**. El usuario ya puede entrar con esa usuario y clave.
+
+La planta queda guardada en la columna `planta_id` de la hoja **Usuarios** (por ejemplo, `PLT-01`). Un usuario `PLANTA` solo ve el portal y las solicitudes de esa planta. Si el rol no es `PLANTA`, el campo de planta no aparece y `planta_id` queda vacío.
+
+Para cambiar la planta de alguien, edita `planta_id` en la hoja o elimina y vuelve a crear el usuario. Para desactivarlo, cambia `activo` a `NO`.
+
 #### Cómo decir qué usuario es cada rol
 
-En **Crear usuario y clave** eliges el rol en el desplegable. Después puedes cambiarlo directamente en la columna `rol` de la hoja **Usuarios** y recargar la app:
+En **Crear usuario** eliges el rol en el desplegable. Después puedes cambiarlo directamente en la columna `rol` de la hoja **Usuarios** y recargar la app:
 
 | Rol en la hoja | Usuario para | Qué puede hacer |
 | --- | --- | --- |

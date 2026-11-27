@@ -141,6 +141,7 @@
         if (!overlay) return;
         overlay.classList.remove("hidden");
         overlay.classList.add("flex");
+        actualizarVistaAuth("login");
         if (mensaje) textoEstado("login-estado", mensaje, false);
         if (window.lucide && typeof window.lucide.createIcons === "function") {
             window.lucide.createIcons();
@@ -302,26 +303,122 @@
         window.location.reload();
     }
 
+    function htmlSeguro(valor) {
+        return String(valor || "").replace(/[&<>"']/g, car => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[car]);
+    }
+
+    function actualizarVistaAuth(vista) {
+        const esCrear = vista === "crear";
+        const loginForm = document.getElementById("login-form");
+        const crearForm = document.getElementById("crear-usuario-form");
+        const tabLogin = document.getElementById("auth-tab-login");
+        const tabCrear = document.getElementById("auth-tab-crear");
+
+        if (loginForm) loginForm.classList.toggle("hidden", esCrear);
+        if (crearForm) crearForm.classList.toggle("hidden", !esCrear);
+
+        if (tabLogin) {
+            tabLogin.classList.toggle("is-active", !esCrear);
+            tabLogin.setAttribute("aria-selected", String(!esCrear));
+        }
+        if (tabCrear) {
+            tabCrear.classList.toggle("is-active", esCrear);
+            tabCrear.setAttribute("aria-selected", String(esCrear));
+        }
+    }
+
+    function plantasDisponibles() {
+        const origen = document.getElementById("active-planta-selector");
+        if (origen && origen.options && origen.options.length) {
+            return Array.from(origen.options)
+                .filter(op => op.value)
+                .map(op => ({ id: op.value, texto: op.textContent }));
+        }
+        if (typeof appPlantas !== "undefined" && Array.isArray(appPlantas)) {
+            return appPlantas.map(p => ({
+                id: p.id,
+                texto: p.nombre + (p.ciudad ? " (" + String(p.ciudad).split("-")[0].trim() + ")" : "")
+            }));
+        }
+        return [];
+    }
+
+    function conectarFormularioCrear() {
+        const rol = document.getElementById("new-rol");
+        const planta = document.getElementById("new-planta");
+        if (rol && !rol.dataset.authReady) {
+            rol.addEventListener("change", actualizarCamposRol);
+            rol.dataset.authReady = "1";
+        }
+        if (planta && !planta.dataset.authReady) {
+            planta.addEventListener("change", actualizarCamposRol);
+            planta.dataset.authReady = "1";
+        }
+    }
+
+    function actualizarCamposRol() {
+        const rol = (document.getElementById("new-rol")?.value || "LECTURA").toUpperCase();
+        const campoPlanta = document.getElementById("new-planta-field");
+        const planta = document.getElementById("new-planta");
+        const ayudaRol = document.getElementById("new-rol-help");
+        const ayudaPlanta = document.getElementById("new-planta-help");
+
+        const guia = {
+            ADMIN: "Puede crear usuarios, cambiar configuración y ver todas las áreas y plantas.",
+            FICHAS: "Puede registrar fichas técnicas y salidas, y exportarlas. No crea usuarios ni cambia configuración.",
+            TELAS: "Puede despachar materiales de la bodega de telas y exportar. No ve la configuración.",
+            INSUMOS: "Puede despachar materiales del almacén de insumos y exportar. No ve la configuración.",
+            PLANTA: "Ve solo la planta asignada, puede solicitar materiales y confirmar recepciones.",
+            LECTURA: "Solo puede consultar y exportar información. No puede editar ni despachar."
+        };
+        if (ayudaRol) ayudaRol.textContent = guia[rol] || guia.LECTURA;
+
+        const esPlanta = rol === "PLANTA";
+        if (campoPlanta) campoPlanta.classList.toggle("hidden", !esPlanta);
+        if (planta) {
+            planta.disabled = !esPlanta;
+            planta.required = esPlanta;
+            if (!esPlanta) planta.value = "";
+        }
+
+        if (ayudaPlanta) {
+            if (!esPlanta) {
+                ayudaPlanta.textContent = "La planta solo se elige cuando el rol es Planta externa.";
+                return;
+            }
+            const elegida = typeof appPlantas !== "undefined" && Array.isArray(appPlantas)
+                ? appPlantas.find(p => p.id === (planta?.value || ""))
+                : null;
+            ayudaPlanta.textContent = elegida
+                ? "Este usuario verá solo " + elegida.nombre + (elegida.ciudad ? " — " + elegida.ciudad : "") + "."
+                : "Selecciona la planta a la que pertenece. El usuario verá solo esa planta.";
+        }
+    }
+
     function cargarPlantasEnFormulario() {
         const destino = document.getElementById("new-planta");
-        const origen = document.getElementById("active-planta-selector");
-        if (!destino || !origen) return;
+        if (!destino) return;
         const actual = destino.value;
-        destino.innerHTML = '<option value="">Planta (solo para rol PLANTA)</option>' +
-            Array.from(origen.options || [])
-                .filter(op => op.value)
-                .map(op => `<option value="${op.value}">${op.textContent}</option>`)
+        destino.innerHTML = '<option value="">Selecciona la planta</option>' +
+            plantasDisponibles()
+                .map(op => `<option value="${htmlSeguro(op.id)}">${htmlSeguro(op.texto)}</option>`)
                 .join("");
         destino.value = actual;
+        actualizarCamposRol();
+    }
+
+    function mostrarLogin() {
+        actualizarVistaAuth("login");
+        mostrarOverlay();
     }
 
     function mostrarCrearUsuario() {
-        const form = document.getElementById("crear-usuario-form");
-        const loginForm = document.getElementById("login-form");
-        if (!form) return;
-        form.classList.remove("hidden");
-        if (loginForm) loginForm.classList.add("hidden");
+        mostrarOverlay();
+        actualizarVistaAuth("crear");
         textoEstado("crear-error", "", false);
+        conectarFormularioCrear();
         cargarPlantasEnFormulario();
 
         const cajaSetup = document.getElementById("new-setup-box");
@@ -330,27 +427,39 @@
     }
 
     function ocultarCrearUsuario() {
-        const form = document.getElementById("crear-usuario-form");
-        const loginForm = document.getElementById("login-form");
-        if (form) form.classList.add("hidden");
-        if (loginForm) loginForm.classList.remove("hidden");
         textoEstado("crear-error", "", false);
+        actualizarVistaAuth("login");
+        if (sesion && sesion.rol === "ADMIN") {
+            ocultarOverlay();
+            return;
+        }
+        mostrarOverlay();
     }
 
     async function crearUsuario(evento) {
         if (evento) evento.preventDefault();
         textoEstado("crear-error", "", false);
 
+        const rol = (document.getElementById("new-rol")?.value || "LECTURA").toUpperCase();
+        const planta = document.getElementById("new-planta");
+        const plantaId = rol === "PLANTA" && planta && !planta.disabled
+            ? (planta.value || "").trim()
+            : "";
         const datos = {
             usuario: (document.getElementById("new-usuario")?.value || "").trim(),
             nombre: (document.getElementById("new-nombre")?.value || "").trim(),
             correo: (document.getElementById("new-correo")?.value || "").trim(),
-            rol: (document.getElementById("new-rol")?.value || "LECTURA").toUpperCase(),
-            plantaId: (document.getElementById("new-planta")?.value || "").trim(),
+            rol: rol,
+            plantaId: plantaId,
             clave: document.getElementById("new-clave")?.value || "",
             setupKey: document.getElementById("new-setup-key")?.value || "",
             tokenAdmin: sesion?.token || ""
         };
+
+        if (rol === "PLANTA" && !plantaId) {
+            textoEstado("crear-error", "Selecciona la planta asignada para este usuario.", true);
+            return;
+        }
 
         const btn = document.getElementById("crear-submit");
         if (btn) btn.disabled = true;
@@ -363,10 +472,20 @@
             return;
         }
 
+        const mensaje = respuesta.mensaje || "Usuario creado. Ya puede iniciar sesión.";
         const form = document.getElementById("crear-usuario-form");
         if (form) form.reset();
+        actualizarCamposRol();
+
+        if (sesion && sesion.rol === "ADMIN") {
+            textoEstado("login-estado", mensaje, false);
+            ocultarCrearUsuario();
+            if (typeof showToast === "function") showToast(mensaje);
+            return;
+        }
+
         ocultarCrearUsuario();
-        textoEstado("login-estado", respuesta.mensaje || "Usuario creado. Ya puede iniciar sesión.", false);
+        textoEstado("login-estado", mensaje, false);
         const usuarioInput = document.getElementById("login-usuario");
         if (usuarioInput) usuarioInput.value = datos.usuario;
         const claveInput = document.getElementById("login-clave");
@@ -384,6 +503,7 @@
         iniciar: iniciar,
         login: login,
         crearUsuario: crearUsuario,
+        mostrarLogin: mostrarLogin,
         mostrarCrearUsuario: mostrarCrearUsuario,
         ocultarCrearUsuario: ocultarCrearUsuario,
         logout: logout,
