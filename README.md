@@ -207,6 +207,14 @@ El acceso usa una hoja de Google Sheets del Workspace, sin Firebase Authenticati
 6. Copia la URL `.../exec` y pégala en `APP_SYSTEM.apiAuthUrl` dentro de `js/config.js`.
 7. Recarga la app. En el primer acceso pulsa **Crear usuario y clave**, digita la `USER_SETUP_KEY` y crea el usuario `ADMIN`. A partir de ahí, los usuarios nuevos los crea ese administrador desde el mismo formulario.
 
+Estado actual del despliegue:
+
+- Web App de login: `https://script.google.com/macros/s/AKfycbw9mU3jE4Z-Y8xPKxIZHsuVBPUUskQwlQOgYNJN1koDYGmJBMXEHoIrCTvk3E2sIgQi/exec`
+- Hoja de usuarios: `https://docs.google.com/spreadsheets/d/1Efb3Aa5lJhfq7FyYNQSNFfWOqoRHl6lr_vi895QDf7k/edit`
+- Ya existe el usuario `ADMIN` creado con la hoja; los accesos nuevos los da ese administrador.
+
+> Nota técnica: Apps Script no permite CORS y envía `X-Frame-Options`, así que el navegador no puede leer la respuesta del Web App. El cliente envía la acción con `navigator.sendBeacon` (o `fetch` de respaldo) y obtiene el resultado con JSONP usando un nonce. La clave viaja en el cuerpo de un POST, nunca en la URL.
+
 Si `APP_SYSTEM.apiAuthUrl` queda vacío, el login se desactiva y la app entra directamente (útil mientras terminas la configuración).
 
 #### Cómo decir qué usuario es cada rol
@@ -228,7 +236,7 @@ Columnas de la hoja: `usuario | nombre | correo | rol | planta_id | activo | sal
 
 ### 9. Verificación posterior al despliegue
 
-- [ ] La URL de Render carga sin consola con errores.
+- [ ] La URL de GitHub Pages carga sin errores en consola.
 - [ ] La interfaz se ve con estilos aunque no haya internet (Tailwind, Inter y Lucide son locales).
 - [ ] El logo y los iconos se ven.
 - [ ] Cambiar entre *Gestión Central* y *Planta Externa*.
