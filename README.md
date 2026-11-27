@@ -20,7 +20,8 @@ css/tailwind.src.css  Fuente de Tailwind usada para recompilar
 css/fonts.css         Tipografía Inter servida localmente
 css/styles.css        Reglas propias e impresión de remisiones
 fonts/                Archivos woff2 de Inter (latin y latin-ext)
-img/logo.png          Logotipo usado en cabecera y remisiones
+img/logo.png          Logotipo original, usado en remisiones (fondo claro)
+img/logo-dark.png     Versión clara del logotipo, usada en cabeceras oscuras
 js/vendor/lucide.min.js  Iconos Lucide locales
 js/config.js          URLs, token y configuración de Firebase  <-- editar al desplegar
 js/storage.js         Persistencia, Firebase y envío al Script
